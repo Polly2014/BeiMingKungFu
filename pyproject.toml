@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "beiming"
+name = "beimingkungfu"
 version = "0.1.0"
 description = "Agent soul transfer — export, absorb, and merge AI agent identities across machines"
 readme = "README.md"
@@ -29,5 +29,5 @@ dependencies = [
 beiming = "beiming.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/Polly2014/Beiming"
-Repository = "https://github.com/Polly2014/Beiming"
+Homepage = "https://github.com/Polly2014/BeiMingKungFu"
+Repository = "https://github.com/Polly2014/BeiMingKungFu"

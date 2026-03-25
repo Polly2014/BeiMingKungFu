@@ -16,7 +16,7 @@ Beiming solves this. Your agent's soul is portable.
 ## Quick Start
 
 ```bash
-pip install beiming
+pip install beimingkungfu
 
 # Export your agent's soul
 beiming export
