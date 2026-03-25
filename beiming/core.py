@@ -30,7 +30,6 @@ def export_soul(
     output: Optional[Path] = None,
     include_config: bool = True,
     include_projects: bool = False,
-    encrypt: bool = False,
     name_override: Optional[str] = None,
 ) -> Path:
     """
@@ -68,7 +67,6 @@ def export_soul(
         source_workspace=str(workspace),
         exported_at=datetime.now(timezone.utc).isoformat(),
         layers=layers,
-        encrypted=encrypt,
     )
     
     # Generate output filename
@@ -194,6 +192,13 @@ def absorb_soul(
                 member_name = f"workspace/{rel_path}"
                 target_file = target_workspace / rel_path
                 
+                # Path traversal guard: ensure target stays within workspace
+                try:
+                    target_file.resolve().relative_to(target_workspace.resolve())
+                except ValueError:
+                    summary["files_skipped"] += 1
+                    continue
+                
                 try:
                     member = tar.getmember(member_name)
                 except KeyError:
@@ -252,7 +257,7 @@ def merge_souls(
             tmp = tempfile.mkdtemp(prefix="beiming-merge-")
             temp_dirs.append(tmp)
             with tarfile.open(pkg, "r:gz") as tar:
-                tar.extractall(tmp)
+                tar.extractall(tmp, filter="data")
             manifests.append(_read_manifest(pkg))
         
         # Merge workspace files

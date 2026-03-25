@@ -87,7 +87,14 @@ def export(workspace, output, name, include_projects, no_config):
         
         file_size = result.stat().st_size
         console.print(f"\n[bold green]✅ Soul exported to:[/] {result} ({_format_bytes(file_size)})")
-        console.print(f"[dim]Transfer this file to another machine and run:[/]")
+        
+        # Show redacted fields (P1-5: user should know what got sanitized)
+        if manifest.redacted_fields:
+            console.print(f"\n[bold yellow]🔒 Redacted {len(manifest.redacted_fields)} sensitive field(s):[/]")
+            for field in manifest.redacted_fields:
+                console.print(f"  [dim]• {field}[/]")
+        
+        console.print(f"\n[dim]Transfer this file to another machine and run:[/]")
         console.print(f"[bold]  beiming absorb {result.name}[/]\n")
         
     except FileNotFoundError as e:
