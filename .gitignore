@@ -8,3 +8,4 @@ build/
 *.bm
 .venv/
 .env
+docs/

@@ -101,7 +101,7 @@ BeiMingKungFu/
 - [ ] 增量导出（delta）— 类似 git pack，不每次全量
 
 ### 🌊 远期 — 灵魂竞技场
-- [ ] **Soul Arena** — Agent 灵魂趣味评估 + PK 平台（Azure VM 部署）
+- [ ] **Soul Arena** — Agent 灵魂趣味评估 + PK 平台（`soul.polly.wang`，Azure VM 部署）
   - 上传 .bm 文件 → 自动分析灵魂特征（记忆量/技能树/人格倾向/活跃度）
   - 灵魂 PK：两个 Agent 的灵魂对比 → 雷达图 + 趣味点评（LLM 生成）
   - 排行榜：最博学 / 技能最多 / 记忆最深 / 最有个性
