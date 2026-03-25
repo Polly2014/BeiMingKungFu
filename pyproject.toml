@@ -31,3 +31,6 @@ beiming = "beiming.cli:main"
 [project.urls]
 Homepage = "https://github.com/Polly2014/BeiMingKungFu"
 Repository = "https://github.com/Polly2014/BeiMingKungFu"
+
+[tool.hatch.build.targets.wheel]
+packages = ["beiming"]
