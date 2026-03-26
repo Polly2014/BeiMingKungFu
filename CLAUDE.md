@@ -133,7 +133,7 @@ SoulPort/                         # (原 BeiMingKungFu/)
 
 ### v0.2.x - 打磨核心体验
 - [x] `soulport doctor` - 灵魂健康检查（五层完整性 + 评分 + 建议 + SoulArena 引流）
-- [ ] `soulport diff` - absorb 前内容级别差异对比
+- [x] `soulport diff` - absorb 前内容级别差异对比（逐层 +/~/◦ + --full unified diff）
 - [ ] 选择性 absorb 交互 - Rich 选择器，逐层勾选
 - [ ] 修 P1-4 glob 匹配 - `_matches_pattern` 的 `**` 边界 case 收紧
 
