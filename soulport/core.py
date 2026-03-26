@@ -1,7 +1,8 @@
 """
-SoulPort core operations — export, absorb, merge, inspect.
+SoulPort core operations — export, absorb, merge, inspect, diff.
 """
 
+import difflib
 import hashlib
 import json
 import os
@@ -9,6 +10,7 @@ import platform
 import shutil
 import tarfile
 import tempfile
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
@@ -377,3 +379,147 @@ def _update_manifest_in_archive(archive_path: Path, manifest: Manifest):
     
     # Atomic replace
     tmp_path.replace(archive_path)
+
+
+# ── Diff ───────────────────────────────────────────────────────────
+
+@dataclass
+class FileDiff:
+    """Diff result for a single file."""
+    rel_path: str
+    status: str     # "added", "removed", "modified", "unchanged"
+    layer: str      # which soul layer it belongs to
+    pkg_size: int = 0
+    ws_size: int = 0
+    diff_lines: list[str] = field(default_factory=list)  # unified diff lines (text files only)
+
+
+@dataclass
+class SoulDiff:
+    """Full diff between a .bm package and workspace."""
+    package_name: str
+    agent_name: str
+    file_diffs: list[FileDiff] = field(default_factory=list)
+    
+    @property
+    def added(self) -> list[FileDiff]:
+        return [d for d in self.file_diffs if d.status == "added"]
+    
+    @property
+    def removed(self) -> list[FileDiff]:
+        return [d for d in self.file_diffs if d.status == "removed"]
+    
+    @property
+    def modified(self) -> list[FileDiff]:
+        return [d for d in self.file_diffs if d.status == "modified"]
+    
+    @property
+    def unchanged(self) -> list[FileDiff]:
+        return [d for d in self.file_diffs if d.status == "unchanged"]
+
+
+def diff_soul(
+    package_path: Path,
+    workspace: Optional[Path] = None,
+) -> SoulDiff:
+    """
+    Compare a .bm package against the current workspace.
+    Shows what would change if you absorbed this package.
+    """
+    if workspace is None:
+        workspace = find_openclaw_workspace()
+        if workspace is None:
+            raise FileNotFoundError(
+                "Cannot find OpenClaw workspace. Use --workspace to specify."
+            )
+    
+    workspace = Path(workspace)
+    package_path = Path(package_path)
+    manifest = _read_manifest(package_path)
+    
+    # Build layer lookup: rel_path -> layer_name
+    layer_map: dict[str, str] = {}
+    for layer in manifest.layers:
+        for f in layer.files:
+            layer_map[f] = layer.name
+    
+    # All files in the package (under workspace/)
+    pkg_files: dict[str, bytes] = {}
+    with tarfile.open(package_path, "r:gz") as tar:
+        for member in tar.getmembers():
+            if member.name.startswith("workspace/") and member.isfile():
+                rel = member.name[len("workspace/"):]
+                f = tar.extractfile(member)
+                if f:
+                    pkg_files[rel] = f.read()
+    
+    # All files in current workspace (matching the same layer patterns)
+    ws_files: set[str] = set()
+    current_layers = scan_workspace(workspace)
+    for layer in current_layers:
+        for f in layer.files:
+            ws_files.add(f)
+            if f not in layer_map:
+                layer_map[f] = layer.name
+    
+    all_paths = sorted(set(pkg_files.keys()) | ws_files)
+    
+    result = SoulDiff(
+        package_name=package_path.name,
+        agent_name=manifest.agent_name,
+    )
+    
+    for rel_path in all_paths:
+        in_pkg = rel_path in pkg_files
+        in_ws = (workspace / rel_path).exists()
+        layer = layer_map.get(rel_path, "unknown")
+        
+        if in_pkg and not in_ws:
+            # File in package but not in workspace → would be added
+            result.file_diffs.append(FileDiff(
+                rel_path=rel_path, status="added", layer=layer,
+                pkg_size=len(pkg_files[rel_path]),
+            ))
+        elif not in_pkg and in_ws:
+            # File in workspace but not in package → would not be touched (kept)
+            # We show this as "removed from package" perspective
+            ws_content = (workspace / rel_path).read_bytes()
+            result.file_diffs.append(FileDiff(
+                rel_path=rel_path, status="removed", layer=layer,
+                ws_size=len(ws_content),
+            ))
+        elif in_pkg and in_ws:
+            # Both exist → compare
+            pkg_content = pkg_files[rel_path]
+            ws_content = (workspace / rel_path).read_bytes()
+            
+            if pkg_content == ws_content:
+                result.file_diffs.append(FileDiff(
+                    rel_path=rel_path, status="unchanged", layer=layer,
+                    pkg_size=len(pkg_content), ws_size=len(ws_content),
+                ))
+            else:
+                diff_lines = _text_diff(rel_path, ws_content, pkg_content)
+                result.file_diffs.append(FileDiff(
+                    rel_path=rel_path, status="modified", layer=layer,
+                    pkg_size=len(pkg_content), ws_size=len(ws_content),
+                    diff_lines=diff_lines,
+                ))
+    
+    return result
+
+
+def _text_diff(filename: str, old_bytes: bytes, new_bytes: bytes) -> list[str]:
+    """Generate unified diff for text files. Returns empty for binary."""
+    try:
+        old_text = old_bytes.decode("utf-8").splitlines(keepends=True)
+        new_text = new_bytes.decode("utf-8").splitlines(keepends=True)
+    except UnicodeDecodeError:
+        return ["(binary file changed)"]
+    
+    return list(difflib.unified_diff(
+        old_text, new_text,
+        fromfile=f"workspace/{filename}",
+        tofile=f"package/{filename}",
+        n=3,
+    ))

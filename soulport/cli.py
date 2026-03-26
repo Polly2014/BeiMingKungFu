@@ -14,7 +14,8 @@ from rich.table import Table
 from rich.tree import Tree
 
 from . import __version__
-from .core import absorb_soul, export_soul, inspect_soul, merge_souls
+from .core import absorb_soul, diff_soul, export_soul, inspect_soul, merge_souls
+from .core import FileDiff, SoulDiff
 from .doctor import DoctorReport, check_soul_health
 from .manifest import Manifest
 
@@ -240,6 +241,27 @@ def doctor(workspace):
     _print_doctor_report(report)
 
 
+@main.command()
+@click.argument("package", type=click.Path(exists=True))
+@click.option("--workspace", "-w", type=click.Path(exists=True), default=None,
+              help="Target workspace path (auto-detects OpenClaw)")
+@click.option("--full", is_flag=True, default=False,
+              help="Show unified diff for modified files")
+def diff(package, workspace, full):
+    """🔍 Compare a .bm package against your current workspace."""
+    console.print(BANNER)
+
+    pkg = Path(package)
+    ws = Path(workspace) if workspace else None
+
+    try:
+        result = diff_soul(package_path=pkg, workspace=ws)
+        _print_diff(result, show_full=full)
+    except (FileNotFoundError, ValueError) as e:
+        console.print(f"[bold red]❌ {e}[/]")
+        sys.exit(1)
+
+
 # ── Display helpers ────────────────────────────────────────────────
 
 LAYER_EMOJIS = {
@@ -347,6 +369,81 @@ def _print_doctor_report(report: DoctorReport):
         console.print("[bold red]🥚 Egg-level soul. Just hatched — lots of room to grow![/]")
 
     console.print(f"\n[dim]See your soul's portrait at[/] [bold]soul.polly.wang[/]\n")
+
+
+STATUS_COLORS = {
+    "added": "green",
+    "removed": "red",
+    "modified": "yellow",
+    "unchanged": "dim",
+}
+STATUS_SYMBOLS = {
+    "added": "+",
+    "removed": "-",
+    "modified": "~",
+    "unchanged": "=",
+}
+
+
+def _print_diff(result: SoulDiff, show_full: bool = False):
+    """Pretty-print a soul diff."""
+
+    # Header
+    header = Table.grid(padding=(0, 2))
+    header.add_row("Package", f"[bold]{result.package_name}[/]")
+    header.add_row("Agent", f"[bold]{result.agent_name}[/]")
+    header.add_row(
+        "Summary",
+        f"[green]+{len(result.added)} added[/] · "
+        f"[yellow]~{len(result.modified)} modified[/] · "
+        f"[red]-{len(result.removed)} only in workspace[/] · "
+        f"[dim]={len(result.unchanged)} unchanged[/]",
+    )
+    console.print(Panel(header, title="[bold]🔍 Soul Diff[/]", border_style="cyan"))
+
+    if not result.added and not result.modified and not result.removed:
+        console.print("\n[green]✅ Package matches workspace perfectly — nothing to change.[/]\n")
+        return
+
+    # Group by layer
+    layers_seen: dict[str, list[FileDiff]] = {}
+    for d in result.file_diffs:
+        if d.status == "unchanged":
+            continue
+        layers_seen.setdefault(d.layer, []).append(d)
+
+    for layer_name, diffs in layers_seen.items():
+        emoji = LAYER_EMOJIS.get(layer_name, "📄")
+        console.print(f"\n{emoji} [bold]{layer_name.title()}[/]")
+
+        for d in sorted(diffs, key=lambda x: x.rel_path):
+            color = STATUS_COLORS[d.status]
+            symbol = STATUS_SYMBOLS[d.status]
+            size_info = ""
+            if d.status == "modified":
+                size_info = f" ({_format_bytes(d.ws_size)} → {_format_bytes(d.pkg_size)})"
+            elif d.status == "added":
+                size_info = f" ({_format_bytes(d.pkg_size)})"
+            elif d.status == "removed":
+                size_info = f" ({_format_bytes(d.ws_size)})"
+
+            console.print(f"  [{color}]{symbol}[/] {d.rel_path}{size_info}")
+
+            if show_full and d.diff_lines:
+                for line in d.diff_lines[:50]:
+                    line = line.rstrip("\n")
+                    if line.startswith("+") and not line.startswith("+++"):
+                        console.print(f"    [green]{line}[/]")
+                    elif line.startswith("-") and not line.startswith("---"):
+                        console.print(f"    [red]{line}[/]")
+                    elif line.startswith("@@"):
+                        console.print(f"    [cyan]{line}[/]")
+                    else:
+                        console.print(f"    [dim]{line}[/]")
+                if len(d.diff_lines) > 50:
+                    console.print(f"    [dim]... {len(d.diff_lines) - 50} more lines[/]")
+
+    console.print()
 
 
 if __name__ == "__main__":
