@@ -190,47 +190,6 @@ def find_openclaw_workspace() -> Optional[Path]:
     return None
 
 
-def find_openclaw_skills() -> list[Path]:
-    """Find OpenClaw skill directories (skills/ and extensions/).
-    
-    OpenClaw stores skills outside the workspace directory:
-    - ~/.openclaw/../openclaw/skills/  (npm package skills)
-    - ~/.openclaw/../openclaw/extensions/  (user-installed extensions)
-    
-    We locate them relative to the openclaw installation.
-    """
-    skill_dirs: list[Path] = []
-    home = Path.home()
-    
-    # Strategy 1: Look for openclaw project in common locations
-    candidates = [
-        # Workspace-relative (if workspace is inside openclaw project)
-        home / ".openclaw",
-    ]
-    
-    # Strategy 2: Find openclaw via which/command
-    import shutil
-    openclaw_bin = shutil.which("openclaw")
-    if openclaw_bin:
-        # Follow symlinks to find the package root
-        bin_path = Path(openclaw_bin).resolve()
-        # Typical: .../openclaw/node_modules/.bin/openclaw -> ../src/...
-        for parent in bin_path.parents:
-            if (parent / "skills").is_dir() and (parent / "package.json").is_file():
-                candidates.insert(0, parent)
-                break
-    
-    for base in candidates:
-        skills_dir = base / "skills"
-        if skills_dir.is_dir():
-            skill_dirs.append(skills_dir)
-        extensions_dir = base / "extensions"
-        if extensions_dir.is_dir():
-            skill_dirs.append(extensions_dir)
-    
-    return skill_dirs
-
-
 def find_openclaw_config() -> Optional[Path]:
     """Auto-detect OpenClaw config file."""
     home = Path.home()
