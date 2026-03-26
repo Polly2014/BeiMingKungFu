@@ -406,8 +406,13 @@ class SoulDiff:
         return [d for d in self.file_diffs if d.status == "added"]
     
     @property
+    def ws_only(self) -> list[FileDiff]:
+        return [d for d in self.file_diffs if d.status == "ws_only"]
+    
+    @property
     def removed(self) -> list[FileDiff]:
-        return [d for d in self.file_diffs if d.status == "removed"]
+        """Alias for ws_only, kept for backward compat."""
+        return self.ws_only
     
     @property
     def modified(self) -> list[FileDiff]:
@@ -421,10 +426,15 @@ class SoulDiff:
 def diff_soul(
     package_path: Path,
     workspace: Optional[Path] = None,
+    # TODO v0.3: add `target: Optional[Path] = None` for .bm vs .bm comparison
+    #   (needed for changelog/lineage — compare two snapshots without a workspace)
 ) -> SoulDiff:
     """
     Compare a .bm package against the current workspace.
     Shows what would change if you absorbed this package.
+
+    Uses _read_manifest() to parse the package and scan_workspace()
+    to discover current workspace files for layer attribution.
     """
     if workspace is None:
         workspace = find_openclaw_workspace()
@@ -481,11 +491,10 @@ def diff_soul(
                 pkg_size=len(pkg_files[rel_path]),
             ))
         elif not in_pkg and in_ws:
-            # File in workspace but not in package → would not be touched (kept)
-            # We show this as "removed from package" perspective
+            # File in workspace but not in package — absorb won't touch it
             ws_content = (workspace / rel_path).read_bytes()
             result.file_diffs.append(FileDiff(
-                rel_path=rel_path, status="removed", layer=layer,
+                rel_path=rel_path, status="ws_only", layer=layer,
                 ws_size=len(ws_content),
             ))
         elif in_pkg and in_ws:
@@ -510,7 +519,10 @@ def diff_soul(
 
 
 def _text_diff(filename: str, old_bytes: bytes, new_bytes: bytes) -> list[str]:
-    """Generate unified diff for text files. Returns empty for binary."""
+    """Generate unified diff for text files. Returns empty for binary or oversized."""
+    # Skip diff for large files (>100KB) — O(n*m) memory/time
+    if len(old_bytes) > 100_000 or len(new_bytes) > 100_000:
+        return [f"(file too large for inline diff: {len(old_bytes)}→{len(new_bytes)} bytes)"]
     try:
         old_text = old_bytes.decode("utf-8").splitlines(keepends=True)
         new_text = new_bytes.decode("utf-8").splitlines(keepends=True)

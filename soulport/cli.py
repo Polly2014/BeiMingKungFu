@@ -14,8 +14,10 @@ from rich.table import Table
 from rich.tree import Tree
 
 from . import __version__
-from .core import absorb_soul, diff_soul, export_soul, inspect_soul, merge_souls
-from .core import FileDiff, SoulDiff
+from .core import (
+    FileDiff, SoulDiff,
+    absorb_soul, diff_soul, export_soul, inspect_soul, merge_souls,
+)
 from .doctor import DoctorReport, check_soul_health
 from .manifest import Manifest
 
@@ -373,13 +375,13 @@ def _print_doctor_report(report: DoctorReport):
 
 STATUS_COLORS = {
     "added": "green",
-    "removed": "red",
+    "ws_only": "dim",
     "modified": "yellow",
     "unchanged": "dim",
 }
 STATUS_SYMBOLS = {
     "added": "+",
-    "removed": "-",
+    "ws_only": "◦",
     "modified": "~",
     "unchanged": "=",
 }
@@ -396,12 +398,12 @@ def _print_diff(result: SoulDiff, show_full: bool = False):
         "Summary",
         f"[green]+{len(result.added)} added[/] · "
         f"[yellow]~{len(result.modified)} modified[/] · "
-        f"[red]-{len(result.removed)} only in workspace[/] · "
+        f"[dim]◦{len(result.ws_only)} ws-only (kept)[/] · "
         f"[dim]={len(result.unchanged)} unchanged[/]",
     )
     console.print(Panel(header, title="[bold]🔍 Soul Diff[/]", border_style="cyan"))
 
-    if not result.added and not result.modified and not result.removed:
+    if not result.added and not result.modified and not result.ws_only:
         console.print("\n[green]✅ Package matches workspace perfectly — nothing to change.[/]\n")
         return
 
@@ -424,8 +426,8 @@ def _print_diff(result: SoulDiff, show_full: bool = False):
                 size_info = f" ({_format_bytes(d.ws_size)} → {_format_bytes(d.pkg_size)})"
             elif d.status == "added":
                 size_info = f" ({_format_bytes(d.pkg_size)})"
-            elif d.status == "removed":
-                size_info = f" ({_format_bytes(d.ws_size)})"
+            elif d.status == "ws_only":
+                size_info = f" ({_format_bytes(d.ws_size)}, won't be changed)"
 
             console.print(f"  [{color}]{symbol}[/] {d.rel_path}{size_info}")
 
@@ -441,7 +443,7 @@ def _print_diff(result: SoulDiff, show_full: bool = False):
                     else:
                         console.print(f"    [dim]{line}[/]")
                 if len(d.diff_lines) > 50:
-                    console.print(f"    [dim]... {len(d.diff_lines) - 50} more lines[/]")
+                    console.print(f"    [dim]... {len(d.diff_lines) - 50} more lines ({len(d.diff_lines)} total)[/]")
 
     console.print()
 
