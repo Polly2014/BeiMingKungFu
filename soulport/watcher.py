@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import Optional
 
 from . import __version__
-from .core import _compute_file_hash, _read_manifest, export_soul
+from .core import _read_manifest, export_soul
+from .scanner import scan_workspace
 
 
 # ── Constants ──────────────────────────────────────────────────────
@@ -21,6 +22,20 @@ from .core import _compute_file_hash, _read_manifest, export_soul
 DEFAULT_SNAPSHOT_DIR = Path.home() / ".soulport" / "snapshots"
 DEFAULT_INTERVAL_SECONDS = 6 * 3600  # 6 hours
 DEFAULT_KEEP = 10
+
+
+def workspace_fingerprint(workspace: Path) -> str:
+    """Compute a fast fingerprint of workspace content (file paths + sizes + mtimes)."""
+    import hashlib
+    h = hashlib.sha256()
+    layers = scan_workspace(workspace)
+    for layer in sorted(layers, key=lambda l: l.name):
+        for f in sorted(layer.files):
+            fp = workspace / f
+            if fp.exists():
+                stat = fp.stat()
+                h.update(f"{f}:{stat.st_size}:{int(stat.st_mtime)}".encode())
+    return h.hexdigest()
 
 
 def parse_interval(s: str) -> int:
@@ -62,10 +77,11 @@ def take_snapshot(
     workspace: Path,
     snapshot_dir: Path,
     parent_hash: str = "",
+    skip_if_unchanged: bool = True,
 ) -> Optional[Path]:
     """
     Take a single snapshot: export workspace → snapshot_dir.
-    Returns the path to the created .bm file, or None on failure.
+    Returns the path to the created .bm file, or None if skipped.
     """
     from .scanner import detect_agent_name
 
@@ -73,12 +89,24 @@ def take_snapshot(
 
     agent_name = detect_agent_name(workspace)
     safe_name = agent_name.replace(" ", "-")
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H%M")
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
     output = snapshot_dir / f"{safe_name}-{timestamp}.bm"
 
-    # Avoid overwriting if same minute
+    # Avoid overwriting if same second
     if output.exists():
         return None
+
+    # Skip if workspace hasn't changed since last snapshot
+    if skip_if_unchanged and parent_hash:
+        latest = get_latest_snapshot(snapshot_dir)
+        if latest:
+            current_fp = workspace_fingerprint(workspace)
+            # Store fingerprint alongside .bm as .fp file
+            latest_fp_file = latest.with_suffix(".fp")
+            if latest_fp_file.exists():
+                last_fp = latest_fp_file.read_text().strip()
+                if current_fp == last_fp:
+                    return None
 
     try:
         result = export_soul(
@@ -92,11 +120,15 @@ def take_snapshot(
         if parent_hash:
             _inject_parent_hash(result, parent_hash)
 
+        # Save fingerprint for future skip-if-unchanged checks
+        fp = workspace_fingerprint(workspace)
+        output.with_suffix(".fp").write_text(fp)
+
         return result
     except Exception:
         # Clean up partial file on failure
         if output.exists():
-            output.unlink()
+            output.unlink(missing_ok=True)
         raise
 
 
@@ -128,14 +160,18 @@ def _inject_parent_hash(bm_path: Path, parent_hash: str):
     tmp_path.replace(bm_path)
 
 
-def cleanup_old_snapshots(snapshot_dir: Path, keep: int):
+def cleanup_old_snapshots(snapshot_dir: Path, keep: int) -> int:
     """Remove old snapshots, keeping the most recent `keep` files."""
     if not snapshot_dir.exists():
-        return
+        return 0
     bm_files = sorted(snapshot_dir.glob("*.bm"), key=lambda p: p.stat().st_mtime)
     to_remove = bm_files[:-keep] if len(bm_files) > keep else []
     for f in to_remove:
         f.unlink()
+        # Also clean up companion .fp fingerprint file
+        fp_file = f.with_suffix(".fp")
+        if fp_file.exists():
+            fp_file.unlink()
     return len(to_remove)
 
 
@@ -145,6 +181,7 @@ def watch_loop(
     interval: int = DEFAULT_INTERVAL_SECONDS,
     keep: int = DEFAULT_KEEP,
     on_snapshot=None,
+    on_skip=None,
     on_error=None,
 ):
     """
@@ -155,7 +192,8 @@ def watch_loop(
         snapshot_dir: Where to store .bm snapshots
         interval: Seconds between snapshots
         keep: Max snapshots to retain
-        on_snapshot: Callback(path, parent_hash) after each snapshot
+        on_snapshot: Callback(path, content_hash, removed_count) after each snapshot
+        on_skip: Callback() when snapshot skipped (unchanged)
         on_error: Callback(exception) on snapshot failure
     """
     running = True
@@ -174,10 +212,15 @@ def watch_loop(
         try:
             result = take_snapshot(workspace, snapshot_dir, parent_hash)
             if result:
-                parent_hash = _compute_file_hash(result)
+                # Read content_hash from the manifest (not file hash!) for lineage
+                manifest = _read_manifest(result)
+                parent_hash = manifest.content_hash
                 removed = cleanup_old_snapshots(snapshot_dir, keep)
                 if on_snapshot:
-                    on_snapshot(result, parent_hash, removed or 0)
+                    on_snapshot(result, parent_hash, removed)
+            else:
+                if on_skip:
+                    on_skip()
         except Exception as e:
             if on_error:
                 on_error(e)

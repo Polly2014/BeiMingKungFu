@@ -290,7 +290,7 @@ def watch(workspace, interval, keep, snapshot_dir, once):
                 console.print(f"[bold green]✅ Snapshot saved:[/] {result}")
                 console.print(f"[dim]Retained {keep} snapshots, removed {removed or 0} old[/]")
             else:
-                console.print("[yellow]⏭️ Snapshot already exists for this minute[/]")
+                console.print("[yellow]⏭️ No changes since last snapshot — skipped[/]")
         except Exception as e:
             console.print(f"[bold red]❌ Snapshot failed: {e}[/]")
             sys.exit(1)
@@ -304,6 +304,8 @@ def watch(workspace, interval, keep, snapshot_dir, once):
     console.print(f"  Retention: [dim]{keep} snapshots[/]")
     console.print(f"\n[dim]Press Ctrl+C to stop.[/]\n")
 
+    from datetime import datetime
+
     def on_snapshot(path, parent_hash, removed):
         ts = datetime.now().strftime("%H:%M:%S")
         console.print(
@@ -311,17 +313,21 @@ def watch(workspace, interval, keep, snapshot_dir, once):
             f"[dim](parent: {parent_hash[:8]}..., cleaned {removed})[/]"
         )
 
+    def on_skip():
+        ts = datetime.now().strftime("%H:%M:%S")
+        console.print(f"[dim]⏭️ [{ts}] No changes — snapshot skipped[/]")
+
     def on_error(e):
         ts = datetime.now().strftime("%H:%M:%S")
         console.print(f"[red]❌ [{ts}] Snapshot failed: {e}[/]")
 
-    from datetime import datetime
     watch_loop(
         workspace=ws,
         snapshot_dir=snap_dir,
         interval=interval_secs,
         keep=keep,
         on_snapshot=on_snapshot,
+        on_skip=on_skip,
         on_error=on_error,
     )
 
