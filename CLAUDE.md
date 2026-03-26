@@ -29,10 +29,11 @@ SoulPort/                         # (原 BeiMingKungFu/)
 ├── pyproject.toml                # Hatchling 打包 + CLI 入口
 ├── soulport/                     # (原 beiming/)
 │   ├── __init__.py               # 版本号
-│   ├── cli.py                    # Click CLI (273行, export/absorb/merge/inspect)
-│   ├── core.py                   # 核心逻辑 (374行, tar.gz 打包/解包/合并)
+│   ├── cli.py                    # Click CLI (export/absorb/merge/inspect/doctor)
+│   ├── core.py                   # 核心逻辑 (tar.gz 打包/解包/合并)
+│   ├── doctor.py                 # 灵魂健康检查 (五层诊断 + 评分)
 │   ├── manifest.py               # 包元数据 (manifest.json, 内容哈希)
-│   └── scanner.py                # 工作区扫描 (209行, 5层文件发现)
+│   └── scanner.py                # 工作区扫描 (5层文件发现)
 └── README.md
 ```
 
@@ -105,6 +106,14 @@ SoulPort/                         # (原 BeiMingKungFu/)
 | v0.6 | GitHub stars | 200+ |
 | v1.0 | 支持框架数 | 3+ |
 
+## Development Process
+
+每个功能实现后需经过 **小龙虾 Review + Baoli 确认** 双重验收：
+1. 实现 → 本地测试通过
+2. 小龙虾 Code Review（评分 + P0/P1/P2 分级建议）
+3. 修复 Review 意见 → 再次确认
+4. 合并 + 更新 CLAUDE.md Roadmap
+
 ## Roadmap
 
 ### v0.1.0 ✅ MVP (2026-03-25) - as BeiMingKungFu
@@ -123,8 +132,8 @@ SoulPort/                         # (原 BeiMingKungFu/)
 - [x] Skill 扫描修复：只统计自定义 skill，不含内置
 
 ### v0.2.x - 打磨核心体验
+- [x] `soulport doctor` - 灵魂健康检查（五层完整性 + 评分 + 建议 + SoulArena 引流）
 - [ ] `soulport diff` - absorb 前内容级别差异对比
-- [ ] `soulport doctor` - 灵魂健康检查（五层完整性 + 建议）
 - [ ] 选择性 absorb 交互 - Rich 选择器，逐层勾选
 - [ ] 修 P1-4 glob 匹配 - `_matches_pattern` 的 `**` 边界 case 收紧
 
