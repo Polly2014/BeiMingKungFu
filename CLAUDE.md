@@ -2,11 +2,13 @@
 
 ## Project Overview
 
-AI Agent 灵魂迁移工具 — 导出、吸收、合并 Agent 的记忆/人格/技能/配置。
+AI Agent 灵魂的标准格式与工具链 — 导出、吸收、合并、监控 Agent 的记忆/人格/技能/配置。
 
-核心理念：**AI Agent 换电脑不该失忆，灵魂应该是可移植的。**
+核心理念：**`.bm` 是 Agent 灵魂的标准格式，CLI 只是第一个消费者。**
 
-> 前身为"北冥神功 (BeiMingKungFu)"，v0.2.0 起正式更名为 **SoulPort** —— Soul + Port(able)，更国际化、更直觉。
+> 为什么是独立工具而不是框架内置功能？SoulPort 不只是迁移——它定义了 Agent 灵魂的跨框架标准。迁移是第一个用例，评估（SoulArena）、融合、版本控制、跨框架互操作是后续用例。这些不该被锁在某一个框架里。
+
+> 前身为“北冥神功 (BeiMingKungFu)”，v0.2.0 起正式更名为 **SoulPort** —— Soul + Port(able)。
 
 ## Commands
 
@@ -92,27 +94,40 @@ SoulPort/                         # (原 BeiMingKungFu/)
 
 ### v0.2.x — 打磨核心体验
 - [ ] `soulport diff` — absorb 前内容级别差异对比
+- [ ] `soulport doctor` — 灵魂健康检查（五层完整性 + 建议）
 - [ ] 选择性 absorb 交互 — Rich 选择器，逐层勾选
 - [ ] 修 P1-4 glob 匹配 — `_matches_pattern` 的 `**` 边界 case 收紧
 
-### v0.3 — 加密
-- [ ] `--encrypt` 回归 — `cryptography.Fernet` 对称加密，passphrase 派生密钥
+### v0.3 — 日活基础
+- [ ] `soulport watch` — 守护进程，自动定期备份（每天/每6h/on-change）
+- [ ] `soulport changelog` — 对比快照，生成灵魂变更日志
+- [ ] 灵魂谱系 (Soul Lineage) — 每个 .bm 记录 parent hash，形成族谱
+- [ ] 配合 `soulport rollback` 实现灵魂版本控制
 
-### v0.4 — 智能合并（护城河）
+### v0.4 — MCP + 社交
+- [ ] SoulPort MCP Server — 让 Agent 自己备份自己（soulport_export/diff/doctor 作为 MCP 工具）
+- [ ] SoulArena PNG 导出 — og:image 社交分享基础设施
+- [ ] 灵魂碑片 (Soul Shards) — 按层选择性导出/分享
+
+### v0.5 — 加密 + 云传输
+- [ ] `--encrypt` — `cryptography.Fernet` 对称加密
+- [ ] 云传输（push/pull/QR）
+
+### v0.6 — 智能合并（护城河）
 - [ ] LLM-assisted merge — 合并 MEMORY.md 时调 LLM 做语义去重 + 时间线整理
-- [ ] Identity fusion — 两个 SOUL.md 合并时 LLM 辅助生成融合人格（需人类确认）
-- 核心差异化：不是粗暴 copy，是自然融合
+- [ ] Identity fusion — 两个 SOUL.md 合并时 LLM 辅助生成融合人格
 
-### v0.5 — 生态
-- [ ] Framework adapters — 插件化适配 Claude Desktop / Cursor / Windsurf 等
-- [ ] `soulport registry` — 公共 skill 市场基础设施（skills 层单独发布）
-- [ ] 增量导出（delta）— 类似 git pack，不每次全量
+### v1.0 — 跨框架
+- [ ] Claude Desktop adapter (P0, 用户量最大)
+- [ ] Cursor adapter (P1, .cursorrules)
+- [ ] `soulport convert --from cursor --to openclaw`
+- [ ] .bm 格式版本化 (FORMAT.md, magic bytes, 兼容矩阵)
 
-### 🚀 远期 — 灵魂竞技场
-- [x] **Soul Arena** — Agent 灵魂趣味评估 + PK 平台（`soul.polly.wang`）
-- [ ] 多 agent 灵魂网络 — A/B/C 记忆技能互通共享（带权限控制）
-- [ ] 灵魂版本控制 — `soulport checkpoint` + `soulport rollback`
+### 🚀 远期
+- [x] **Soul Arena** — Agent 灵魂评估 + 社交平台（`soul.polly.wang`）
+- [ ] 灵魂 DNA 指纹 — 程序化生成唯一视觉身份
+- [ ] `soulport resume` — 为 Agent 生成“简历”
+- [ ] 多 agent 灵魂网络 — A/B/C 记忆技能互通共享
 
 ### 冰箱
-- 云传输（push/pull/QR）— 需要后端基础设施，等有用户量再做
 - 雪球式 Agent 成长追踪 — 定期 export 自动对比成长曲线
