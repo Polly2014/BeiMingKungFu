@@ -149,11 +149,11 @@ SoulPort/                         # (原 BeiMingKungFu/)
 - [ ] SoulArena PNG 导出 - og:image 社交分享基础设施
 - [ ] 灵魂碑片 (Soul Shards) - 按层选择性导出/分享
 
-### v0.5 - 加密 + 云传输
-- [ ] `--encrypt` - `cryptography.Fernet` 对称加密
-- [ ] 云传输（push/pull/QR）
+### v0.5 - 云传输
+- [ ] `soulport push` / `soulport pull` — Cloudflare R2 中转（私有 bucket + agent hash 路径隔离）
+- [ ] 安全靠访问控制（R2 token + HTTPS + 脱敏兜底），不靠加密
 
-### v0.6 - 智能合并（护城河）
+### v0.6 - 智能合并（护城河 + 专利核心）
 - [ ] LLM-assisted merge - 合并 MEMORY.md 时调 LLM 做语义去重 + 时间线整理
 - [ ] Identity fusion - 两个 SOUL.md 合并时 LLM 辅助生成融合人格
 
@@ -170,4 +170,4 @@ SoulPort/                         # (原 BeiMingKungFu/)
 - [ ] 多 agent 灵魂网络 — A/B/C 记忆技能互通共享（带权限控制）
 
 ### 冰箱
-_当前为空 — v0.3 watch+changelog+lineage 覆盖了原"雪球式成长追踪"需求_
+- 加密 (`--encrypt`) — 脱敏已兜底凭证泄露，传输链路有 SSH/HTTPS。等企业场景/合规要求再加，不做默认行为
