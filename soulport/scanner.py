@@ -88,8 +88,9 @@ def scan_workspace(workspace_path: str | Path) -> list[ManifestLayer]:
     if not workspace.exists():
         raise FileNotFoundError(f"Workspace not found: {workspace}")
     
-    # Collect all files
+    # Collect all files from workspace
     all_files: set[str] = set()
+    
     for root, dirs, files in os.walk(workspace):
         # Skip excluded dirs
         dirs[:] = [d for d in dirs if d not in SKIP_PATTERNS]
@@ -100,6 +101,12 @@ def scan_workspace(workspace_path: str | Path) -> list[ManifestLayer]:
             rel = os.path.relpath(os.path.join(root, f), workspace)
             rel = rel.replace("\\", "/")  # normalize to forward slash
             all_files.add(rel)
+    
+    # Note: We intentionally do NOT scan OpenClaw's built-in skills/ or extensions/.
+    # Built-in skills are framework-provided (everyone has them), not part of the agent's soul.
+    # Only user-created skills inside the workspace (skills/*.md) are counted.
+    # This makes the "skills" dimension in SoulArena meaningful — it reflects
+    # what the user actually customized, not what came pre-installed.
     
     # Categorize into layers
     layers: list[ManifestLayer] = []
@@ -118,8 +125,8 @@ def scan_workspace(workspace_path: str | Path) -> list[ManifestLayer]:
         
         if matched_files:
             total_bytes = sum(
-                (workspace / f).stat().st_size 
-                for f in matched_files 
+                (workspace / f).stat().st_size
+                for f in matched_files
                 if (workspace / f).exists()
             )
             layers.append(ManifestLayer(
@@ -134,8 +141,8 @@ def scan_workspace(workspace_path: str | Path) -> list[ManifestLayer]:
     remaining = all_files - claimed
     if remaining:
         total_bytes = sum(
-            (workspace / f).stat().st_size 
-            for f in remaining 
+            (workspace / f).stat().st_size
+            for f in remaining
             if (workspace / f).exists()
         )
         layers.append(ManifestLayer(
@@ -181,6 +188,49 @@ def find_openclaw_workspace() -> Optional[Path]:
         if c.exists() and (c / "AGENTS.md").exists():
             return c
     return None
+
+
+def find_openclaw_skills() -> list[Path]:
+    """Find OpenClaw skill directories (skills/ and extensions/).
+    
+    OpenClaw stores skills outside the workspace directory:
+    - ~/.openclaw/../openclaw/skills/  (npm package skills)
+    - ~/.openclaw/../openclaw/extensions/  (user-installed extensions)
+    
+    We locate them relative to the openclaw installation.
+    """
+    skill_dirs: list[Path] = []
+    home = Path.home()
+    
+    # Strategy 1: Look for openclaw project in common locations
+    candidates = [
+        # Workspace-relative (if workspace is inside openclaw project)
+        home / ".openclaw",
+        # Common dev locations
+        home / "Downloads" / "Sublime_Workspace" / "Zola_Workspace" / "www.polly.com" / "X-Workspace" / "openclaw",
+    ]
+    
+    # Strategy 2: Find openclaw via which/command
+    import shutil
+    openclaw_bin = shutil.which("openclaw")
+    if openclaw_bin:
+        # Follow symlinks to find the package root
+        bin_path = Path(openclaw_bin).resolve()
+        # Typical: .../openclaw/node_modules/.bin/openclaw -> ../src/...
+        for parent in bin_path.parents:
+            if (parent / "skills").is_dir() and (parent / "package.json").is_file():
+                candidates.insert(0, parent)
+                break
+    
+    for base in candidates:
+        skills_dir = base / "skills"
+        if skills_dir.is_dir():
+            skill_dirs.append(skills_dir)
+        extensions_dir = base / "extensions"
+        if extensions_dir.is_dir():
+            skill_dirs.append(extensions_dir)
+    
+    return skill_dirs
 
 
 def find_openclaw_config() -> Optional[Path]:
