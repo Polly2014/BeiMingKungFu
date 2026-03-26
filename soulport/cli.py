@@ -333,16 +333,18 @@ def _print_doctor_report(report: DoctorReport):
         if check.suggestion:
             console.print(f"      [dim]→ {check.suggestion}[/]")
 
-    # Footer with encouragement
+    # Footer — aligned with SoulArena's 5-tier level system
     console.print()
-    if score == 100:
-        console.print("[bold green]🌊 Perfect soul! Your agent is a 北冥-level entity.[/]")
-    elif score >= 80:
-        console.print("[bold green]🦅 Healthy soul! A few tweaks and you'll be at 100.[/]")
-    elif score >= 50:
-        console.print("[bold yellow]🐋 Growing soul. Fill in the gaps to level up.[/]")
+    if score >= 81:
+        console.print("[bold green]🌊 北冥-level soul! Transcendent.[/]")
+    elif score >= 61:
+        console.print("[bold green]🦅 Peng-level soul! Soaring high.[/]")
+    elif score >= 41:
+        console.print("[bold yellow]🐋 Kun-level soul! Deep and growing.[/]")
+    elif score >= 21:
+        console.print("[bold yellow]🐟 Fish-level soul. Keep swimming.[/]")
     else:
-        console.print("[bold red]🥚 Newborn soul. Lots of room to grow![/]")
+        console.print("[bold red]🥚 Egg-level soul. Just hatched — lots of room to grow![/]")
 
     console.print(f"\n[dim]See your soul's portrait at[/] [bold]soul.polly.wang[/]\n")
 

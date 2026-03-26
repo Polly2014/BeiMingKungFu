@@ -2,7 +2,9 @@
 SoulPort doctor — soul health check across all five layers.
 """
 
+import json
 import os
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -83,7 +85,7 @@ def _check_identity(ws: Path, report: DoctorReport):
         has_name = "Name:" in content or "name:" in content
         has_emoji = any(c for c in content if ord(c) > 0x1F000)
 
-        if has_name and size > 100:
+        if has_name and has_emoji and size > 100:
             report.checks.append(CheckResult(
                 layer=layer, name="IDENTITY.md",
                 status="ok",
@@ -93,6 +95,8 @@ def _check_identity(ws: Path, report: DoctorReport):
             issues = []
             if not has_name:
                 issues.append("no Name field")
+            if not has_emoji:
+                issues.append("no emoji")
             if size <= 100:
                 issues.append(f"very short ({size} bytes)")
             report.checks.append(CheckResult(
@@ -202,6 +206,17 @@ def _check_memory(ws: Path, report: DoctorReport):
                 status="ok",
                 detail=f"{total_files} files ({len(md_files)} md, {len(json_files)} json){span_str} — {density}",
             ))
+
+            # Check for dormancy: last memory too old?
+            if dates:
+                days_since_last = (datetime.now() - max(dates)).days
+                if days_since_last > 7:
+                    report.checks.append(CheckResult(
+                        layer=layer, name="Recent activity",
+                        status="warn",
+                        detail=f"Last memory was {days_since_last} days ago",
+                        suggestion="Your agent might be dormant — try `soulport export` to capture recent state",
+                    ))
     else:
         report.checks.append(CheckResult(
             layer=layer, name="memory/ directory",
@@ -265,6 +280,7 @@ def _check_skills(ws: Path, report: DoctorReport):
 
     skills_dir = ws / "skills"
     if skills_dir.is_dir():
+        # Reuse scanner's SKIP_PATTERNS to filter out build artifacts (.git, __pycache__, etc.)
         skill_dirs = [
             d for d in skills_dir.iterdir()
             if d.is_dir() and d.name not in SKIP_PATTERNS
@@ -311,7 +327,6 @@ def _check_system(ws: Path, report: DoctorReport):
     config_path = find_openclaw_config()
     if config_path and config_path.exists():
         try:
-            import json
             data = json.loads(config_path.read_text(encoding="utf-8"))
             keys = list(data.keys())
             report.checks.append(CheckResult(
@@ -340,7 +355,6 @@ def _check_system(ws: Path, report: DoctorReport):
 def _extract_dates_from_paths(paths: list[Path]) -> list[datetime]:
     """Try to extract dates from file paths like memory/2026-03-25.md."""
     dates = []
-    import re
     date_pattern = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
     for p in paths:
         match = date_pattern.search(str(p))
