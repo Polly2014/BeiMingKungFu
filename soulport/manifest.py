@@ -42,6 +42,7 @@ class Manifest:
     # Security
     redacted_fields: list[str] = field(default_factory=list)  # what was sanitized
     content_hash: str = ""                   # SHA256 of all content
+    parent_hash: str = ""                    # content_hash of previous export (Soul Lineage)
     encrypted: bool = False
     
     def to_dict(self) -> dict:
@@ -65,6 +66,7 @@ class Manifest:
             ],
             "redacted_fields": self.redacted_fields,
             "content_hash": self.content_hash,
+            "parent_hash": self.parent_hash,
             "encrypted": self.encrypted,
         }
     
@@ -87,5 +89,6 @@ class Manifest:
             layers=layers,
             redacted_fields=data.get("redacted_fields", []),
             content_hash=data.get("content_hash", ""),
+            parent_hash=data.get("parent_hash", ""),
             encrypted=data.get("encrypted", False),
         )

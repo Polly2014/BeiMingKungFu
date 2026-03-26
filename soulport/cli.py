@@ -244,6 +244,91 @@ def doctor(workspace):
 
 
 @main.command()
+@click.option("--workspace", "-w", type=click.Path(exists=True), default=None,
+              help="Agent workspace path (auto-detects OpenClaw)")
+@click.option("--interval", "-i", default="6h",
+              help="Backup interval (e.g. 6h, 30m, 1d)")
+@click.option("--keep", "-k", default=10, type=int,
+              help="Max snapshots to retain (default: 10)")
+@click.option("--snapshot-dir", type=click.Path(), default=None,
+              help="Snapshot directory (default: ~/.soulport/snapshots/)")
+@click.option("--once", is_flag=True, default=False,
+              help="Take one snapshot and exit (no daemon)")
+def watch(workspace, interval, keep, snapshot_dir, once):
+    """⏰ Auto-backup your agent's soul on a schedule.
+
+    Runs as a daemon, periodically exporting workspace snapshots.
+    Each snapshot records its parent's hash, forming a lineage chain.
+    """
+    console.print(BANNER)
+
+    from .scanner import find_openclaw_workspace
+    from .watcher import (
+        DEFAULT_SNAPSHOT_DIR,
+        cleanup_old_snapshots,
+        get_parent_hash,
+        parse_interval,
+        take_snapshot,
+        watch_loop,
+    )
+
+    ws = Path(workspace) if workspace else find_openclaw_workspace()
+    if ws is None:
+        console.print("[bold red]❌ Cannot find OpenClaw workspace. Use --workspace to specify.[/]")
+        sys.exit(1)
+
+    snap_dir = Path(snapshot_dir) if snapshot_dir else DEFAULT_SNAPSHOT_DIR
+    interval_secs = parse_interval(interval)
+
+    if once:
+        # Single snapshot mode
+        parent_hash = get_parent_hash(snap_dir)
+        try:
+            result = take_snapshot(ws, snap_dir, parent_hash)
+            if result:
+                removed = cleanup_old_snapshots(snap_dir, keep)
+                console.print(f"[bold green]✅ Snapshot saved:[/] {result}")
+                console.print(f"[dim]Retained {keep} snapshots, removed {removed or 0} old[/]")
+            else:
+                console.print("[yellow]⏭️ Snapshot already exists for this minute[/]")
+        except Exception as e:
+            console.print(f"[bold red]❌ Snapshot failed: {e}[/]")
+            sys.exit(1)
+        return
+
+    # Daemon mode
+    console.print(f"[bold cyan]⏰ Starting soul watch daemon[/]")
+    console.print(f"  Workspace: [dim]{ws}[/]")
+    console.print(f"  Snapshots: [dim]{snap_dir}[/]")
+    console.print(f"  Interval:  [dim]{interval}[/]")
+    console.print(f"  Retention: [dim]{keep} snapshots[/]")
+    console.print(f"\n[dim]Press Ctrl+C to stop.[/]\n")
+
+    def on_snapshot(path, parent_hash, removed):
+        ts = datetime.now().strftime("%H:%M:%S")
+        console.print(
+            f"[green]📸 [{ts}] Snapshot:[/] {path.name} "
+            f"[dim](parent: {parent_hash[:8]}..., cleaned {removed})[/]"
+        )
+
+    def on_error(e):
+        ts = datetime.now().strftime("%H:%M:%S")
+        console.print(f"[red]❌ [{ts}] Snapshot failed: {e}[/]")
+
+    from datetime import datetime
+    watch_loop(
+        workspace=ws,
+        snapshot_dir=snap_dir,
+        interval=interval_secs,
+        keep=keep,
+        on_snapshot=on_snapshot,
+        on_error=on_error,
+    )
+
+    console.print("\n[bold cyan]👋 Watch daemon stopped.[/]")
+
+
+@main.command()
 @click.argument("package", type=click.Path(exists=True))
 @click.option("--workspace", "-w", type=click.Path(exists=True), default=None,
               help="Target workspace path (auto-detects OpenClaw)")
