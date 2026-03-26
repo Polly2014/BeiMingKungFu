@@ -11,7 +11,7 @@ AI Agent 灵魂迁移工具 — 导出、吸收、合并 Agent 的记忆/人格/
 ## Commands
 
 ```bash
-cd X-Workspace/BeiMingKungFu    # 目录稍后将 rename 为 SoulPort
+cd X-Workspace/SoulPort
 pip install -e .                # 本地安装
 
 soulport export                 # 导出当前 Agent 灵魂 → .bm 文件
