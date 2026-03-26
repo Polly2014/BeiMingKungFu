@@ -137,11 +137,11 @@ SoulPort/                         # (原 BeiMingKungFu/)
 - [ ] 选择性 absorb 交互 - Rich 选择器，逐层勾选
 - [ ] 修 P1-4 glob 匹配 - `_matches_pattern` 的 `**` 边界 case 收紧
 
-### v0.3 - 日活基础
+### v0.3 ✅ 日活基础 (2026-03-27)
 - [x] `soulport watch` - 守护进程，自动定期备份（每天/每6h/on-change + skip-if-unchanged）
 - [x] 灵魂谱系 (Soul Lineage) - manifest.json `parent_hash` 字段，形成族谱链
-- [ ] `soulport changelog` - 对比快照，生成灵魂变更日志（`--narrative` 让 LLM 写人话摘要）
-- [ ] `soulport rollback <hash>` - 回滚到指定快照，配合 watch 实现灵魂版本控制
+- [x] `soulport changelog` - 对比快照，生成灵魂变更日志（逐层摘要 + --full 文件详情）
+- [x] `soulport rollback <hash>` - 回滚到指定快照（--dry-run 预览 + --force 执行）
 
 ### v0.4 - MCP + 社交
 - [ ] SoulPort MCP Server - 让 Agent 自己备份自己（soulport_export/diff/doctor 作为 MCP 工具）
