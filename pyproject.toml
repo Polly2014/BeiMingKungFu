@@ -25,8 +25,12 @@ dependencies = [
     "rich>=13.0",
 ]
 
+[project.optional-dependencies]
+mcp = ["fastmcp>=2.0"]
+
 [project.scripts]
 soulport = "soulport.cli:main"
+soulport-mcp = "soulport.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/Polly2014/SoulPort"

@@ -247,6 +247,51 @@ def doctor(workspace):
 @main.command()
 @click.option("--workspace", "-w", type=click.Path(exists=True), default=None,
               help="Agent workspace path (auto-detects OpenClaw)")
+@click.option("--snapshot-dir", type=click.Path(), default=None,
+              help="Snapshot directory (default: ~/.soulport/snapshots/)")
+def status(workspace, snapshot_dir):
+    """📊 Show soul status: health, snapshots, last backup."""
+    console.print(BANNER)
+
+    from .scanner import find_openclaw_workspace, detect_agent_name
+    from .watcher import DEFAULT_SNAPSHOT_DIR, list_snapshots
+
+    ws = Path(workspace) if workspace else find_openclaw_workspace()
+    snap_dir = Path(snapshot_dir) if snapshot_dir else DEFAULT_SNAPSHOT_DIR
+
+    # Agent info
+    if ws:
+        agent_name = detect_agent_name(ws)
+        report = check_soul_health(ws)
+
+        header = Table.grid(padding=(0, 2))
+        header.add_row("Agent", f"[bold]{agent_name}[/]")
+        header.add_row("Workspace", f"[dim]{ws}[/]")
+        header.add_row("Health", f"[bold]{report.health_score}/100[/]")
+        console.print(Panel(header, title="[bold]📊 Soul Status[/]", border_style="cyan"))
+    else:
+        console.print("[bold red]❌ Cannot find OpenClaw workspace.[/]")
+
+    # Snapshots
+    if snap_dir.exists():
+        snapshots = list_snapshots(snap_dir)
+        console.print(f"\n[bold]📦 Snapshots:[/] {len(snapshots)} in [dim]{snap_dir}[/]")
+        if snapshots:
+            latest = snapshots[0]
+            size_kb = latest['size'] / 1024
+            console.print(f"  Latest: [bold]{latest['name']}[/]")
+            console.print(f"  Exported: {latest['exported_at'][:19]}")
+            console.print(f"  Hash: [dim]{latest['content_hash'][:16]}...[/]")
+            console.print(f"  Size: {size_kb:.1f} KB")
+    else:
+        console.print(f"\n[dim]No snapshots yet. Run `soulport watch --once` to start.[/]")
+
+    console.print()
+
+
+@main.command()
+@click.option("--workspace", "-w", type=click.Path(exists=True), default=None,
+              help="Agent workspace path (auto-detects OpenClaw)")
 @click.option("--interval", "-i", default="6h",
               help="Backup interval (e.g. 6h, 30m, 1d)")
 @click.option("--keep", "-k", default=10, type=int,
