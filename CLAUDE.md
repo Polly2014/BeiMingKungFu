@@ -143,8 +143,9 @@ SoulPort/                         # (原 BeiMingKungFu/)
 - [x] `soulport changelog` - 对比快照，生成灵魂变更日志（逐层摘要 + --full 文件详情）
 - [x] `soulport rollback <hash>` - 回滚到指定快照（--dry-run 预览 + --force 执行）
 
-### v0.4 - MCP + 社交
-- [ ] SoulPort MCP Server - 让 Agent 自己备份自己（soulport_export/diff/doctor 作为 MCP 工具）
+### v0.4 ✅ MCP + 社交 (2026-03-27)
+- [x] SoulPort MCP Server - 6 tools (export/doctor/diff/changelog/status/snapshot), FastMCP, stdio+HTTP
+- [x] `soulport status` CLI - 健康分 + 快照概览
 - [ ] SoulArena PNG 导出 - og:image 社交分享基础设施
 - [ ] 灵魂碑片 (Soul Shards) - 按层选择性导出/分享
 
