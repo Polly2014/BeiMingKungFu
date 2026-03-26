@@ -454,14 +454,7 @@ def diff_soul(
             layer_map[f] = layer.name
     
     # All files in the package (under workspace/)
-    pkg_files: dict[str, bytes] = {}
-    with tarfile.open(package_path, "r:gz") as tar:
-        for member in tar.getmembers():
-            if member.name.startswith("workspace/") and member.isfile():
-                rel = member.name[len("workspace/"):]
-                f = tar.extractfile(member)
-                if f:
-                    pkg_files[rel] = f.read()
+    pkg_files = _extract_workspace_files(package_path)
     
     # All files in current workspace (matching the same layer patterns)
     ws_files: set[str] = set()
@@ -516,6 +509,126 @@ def diff_soul(
                 ))
     
     return result
+
+
+def diff_packages(old_path: Path, new_path: Path) -> SoulDiff:
+    """
+    Compare two .bm packages (old vs new) for changelog/lineage.
+    """
+    old_manifest = _read_manifest(old_path)
+    new_manifest = _read_manifest(new_path)
+
+    layer_map: dict[str, str] = {}
+    for m in (old_manifest, new_manifest):
+        for layer in m.layers:
+            for f in layer.files:
+                layer_map[f] = layer.name
+
+    old_files: dict[str, bytes] = _extract_workspace_files(old_path)
+    new_files: dict[str, bytes] = _extract_workspace_files(new_path)
+
+    all_paths = sorted(set(old_files.keys()) | set(new_files.keys()))
+
+    result = SoulDiff(
+        package_name=f"{old_path.name} → {new_path.name}",
+        agent_name=new_manifest.agent_name,
+    )
+
+    for rel_path in all_paths:
+        in_old = rel_path in old_files
+        in_new = rel_path in new_files
+        layer = layer_map.get(rel_path, "unknown")
+
+        if in_new and not in_old:
+            result.file_diffs.append(FileDiff(
+                rel_path=rel_path, status="added", layer=layer,
+                pkg_size=len(new_files[rel_path]),
+            ))
+        elif in_old and not in_new:
+            result.file_diffs.append(FileDiff(
+                rel_path=rel_path, status="ws_only", layer=layer,
+                ws_size=len(old_files[rel_path]),
+            ))
+        elif in_old and in_new:
+            if old_files[rel_path] == new_files[rel_path]:
+                result.file_diffs.append(FileDiff(
+                    rel_path=rel_path, status="unchanged", layer=layer,
+                    pkg_size=len(new_files[rel_path]),
+                    ws_size=len(old_files[rel_path]),
+                ))
+            else:
+                diff_lines = _text_diff(rel_path, old_files[rel_path], new_files[rel_path])
+                result.file_diffs.append(FileDiff(
+                    rel_path=rel_path, status="modified", layer=layer,
+                    pkg_size=len(new_files[rel_path]),
+                    ws_size=len(old_files[rel_path]),
+                    diff_lines=diff_lines,
+                ))
+
+    return result
+
+
+def _extract_workspace_files(bm_path: Path) -> dict[str, bytes]:
+    """Extract all workspace/ files from a .bm package into memory."""
+    files: dict[str, bytes] = {}
+    with tarfile.open(bm_path, "r:gz") as tar:
+        for member in tar.getmembers():
+            if member.name.startswith("workspace/") and member.isfile():
+                rel = member.name[len("workspace/"):]
+                f = tar.extractfile(member)
+                if f:
+                    files[rel] = f.read()
+    return files
+
+
+def changelog(
+    snapshot_dir: Path,
+    count: int = 1,
+) -> list[dict]:
+    """
+    Generate changelog entries by comparing consecutive snapshots.
+
+    Returns a list of changelog entries (newest first), each containing:
+    - old_name, new_name: snapshot filenames
+    - old_hash, new_hash: content hashes
+    - exported_at: timestamp of the newer snapshot
+    - summary: {added, removed, modified, unchanged} counts per layer
+    - diff: the full SoulDiff object
+    """
+    bm_files = sorted(snapshot_dir.glob("*.bm"), key=lambda p: p.stat().st_mtime)
+
+    if len(bm_files) < 2:
+        return []
+
+    # Build consecutive pairs: (old, new) for the last `count` transitions
+    all_pairs = [(bm_files[i], bm_files[i + 1]) for i in range(len(bm_files) - 1)]
+    pairs = all_pairs[-count:]  # most recent `count` pairs
+
+    entries = []
+    for old_bm, new_bm in reversed(pairs):
+        old_manifest = _read_manifest(old_bm)
+        new_manifest = _read_manifest(new_bm)
+        soul_diff = diff_packages(old_bm, new_bm)
+
+        # Per-layer summary
+        layer_summary: dict[str, dict[str, int]] = {}
+        for d in soul_diff.file_diffs:
+            if d.layer not in layer_summary:
+                layer_summary[d.layer] = {"added": 0, "removed": 0, "modified": 0, "unchanged": 0}
+            key = "removed" if d.status == "ws_only" else d.status
+            layer_summary[d.layer][key] += 1
+
+        entries.append({
+            "old_name": old_bm.name,
+            "new_name": new_bm.name,
+            "old_hash": old_manifest.content_hash[:12],
+            "new_hash": new_manifest.content_hash[:12],
+            "exported_at": new_manifest.exported_at,
+            "summary": layer_summary,
+            "diff": soul_diff,
+        })
+
+    return entries
 
 
 def _text_diff(filename: str, old_bytes: bytes, new_bytes: bytes) -> list[str]:

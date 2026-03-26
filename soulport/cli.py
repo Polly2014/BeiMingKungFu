@@ -16,7 +16,8 @@ from rich.tree import Tree
 from . import __version__
 from .core import (
     FileDiff, SoulDiff,
-    absorb_soul, diff_soul, export_soul, inspect_soul, merge_souls,
+    absorb_soul, changelog as core_changelog, diff_soul, export_soul,
+    inspect_soul, merge_souls,
 )
 from .doctor import DoctorReport, check_soul_health
 from .manifest import Manifest
@@ -332,6 +333,144 @@ def watch(workspace, interval, keep, snapshot_dir, once):
     )
 
     console.print("\n[bold cyan]👋 Watch daemon stopped.[/]")
+
+
+@main.command(name="changelog")
+@click.option("--snapshot-dir", type=click.Path(exists=True), default=None,
+              help="Snapshot directory (default: ~/.soulport/snapshots/)")
+@click.option("--count", "-n", default=5, type=int,
+              help="Number of recent changes to show (default: 5)")
+@click.option("--full", is_flag=True, default=False,
+              help="Show file-level details for each change")
+def changelog_cmd(snapshot_dir, count, full):
+    """📜 Show recent soul changes between snapshots."""
+    console.print(BANNER)
+
+    from .watcher import DEFAULT_SNAPSHOT_DIR
+
+    snap_dir = Path(snapshot_dir) if snapshot_dir else DEFAULT_SNAPSHOT_DIR
+
+    if not snap_dir.exists():
+        console.print(f"[bold red]❌ No snapshots found at {snap_dir}[/]")
+        console.print("[dim]Run `soulport watch --once` to create your first snapshot.[/]")
+        sys.exit(1)
+
+    entries = core_changelog(snap_dir, count=count)
+
+    if not entries:
+        bm_count = len(list(snap_dir.glob("*.bm")))
+        if bm_count < 2:
+            console.print(f"[yellow]Need at least 2 snapshots to generate changelog (found {bm_count}).[/]")
+            console.print("[dim]Run `soulport watch --once` again after making changes.[/]")
+        else:
+            console.print("[green]No changes between snapshots.[/]")
+        return
+
+    console.print(f"[bold]📜 Soul Changelog[/] — last {len(entries)} change(s)\n")
+
+    for i, entry in enumerate(entries):
+        # Header line
+        ts = entry["exported_at"][:19] if entry["exported_at"] else "?"
+        console.print(
+            f"[bold cyan]#{i + 1}[/] [dim]{entry['old_hash']}→{entry['new_hash']}[/] "
+            f"({ts})"
+        )
+
+        # Per-layer summary
+        has_changes = False
+        for layer_name, counts in sorted(entry["summary"].items()):
+            parts = []
+            if counts["added"]:
+                parts.append(f"[green]+{counts['added']}[/]")
+            if counts["modified"]:
+                parts.append(f"[yellow]~{counts['modified']}[/]")
+            if counts["removed"]:
+                parts.append(f"[red]-{counts['removed']}[/]")
+            if parts:
+                has_changes = True
+                emoji = LAYER_EMOJIS.get(layer_name, "📄")
+                console.print(f"  {emoji} {layer_name}: {' '.join(parts)}")
+
+        if not has_changes:
+            console.print("  [dim]No changes[/]")
+
+        # File-level details if --full
+        if full and has_changes:
+            diff = entry["diff"]
+            for d in diff.file_diffs:
+                if d.status == "unchanged":
+                    continue
+                color = STATUS_COLORS.get(d.status, "white")
+                symbol = STATUS_SYMBOLS.get(d.status, "?")
+                console.print(f"    [{color}]{symbol}[/] {d.rel_path}")
+
+        if i < len(entries) - 1:
+            console.print()
+
+    console.print()
+
+
+@main.command()
+@click.argument("hash_prefix")
+@click.option("--workspace", "-w", type=click.Path(exists=True), default=None,
+              help="Target workspace path (auto-detects OpenClaw)")
+@click.option("--snapshot-dir", type=click.Path(exists=True), default=None,
+              help="Snapshot directory (default: ~/.soulport/snapshots/)")
+@click.option("--force", is_flag=True, default=False,
+              help="Overwrite existing files without asking")
+@click.option("--dry-run", is_flag=True, default=False,
+              help="Preview what would be restored without writing")
+def rollback(hash_prefix, workspace, snapshot_dir, force, dry_run):
+    """⏪ Rollback workspace to a previous snapshot by hash prefix.
+
+    Example: soulport rollback 1be975f7
+    """
+    console.print(BANNER)
+
+    from .watcher import DEFAULT_SNAPSHOT_DIR, find_snapshot_by_hash, list_snapshots
+
+    snap_dir = Path(snapshot_dir) if snapshot_dir else DEFAULT_SNAPSHOT_DIR
+    ws = Path(workspace) if workspace else None
+
+    # Find matching snapshot
+    target = find_snapshot_by_hash(snap_dir, hash_prefix)
+    if target is None:
+        console.print(f"[bold red]❌ No snapshot found matching hash prefix: {hash_prefix}[/]")
+        console.print("\n[bold]Available snapshots:[/]")
+        for s in list_snapshots(snap_dir)[:5]:
+            console.print(f"  [dim]{s['content_hash'][:12]}[/] {s['name']} ({s['exported_at'][:19]})")
+        sys.exit(1)
+
+    manifest = inspect_soul(target)
+    _print_manifest(manifest, title=f"Rollback Target: {target.name}")
+
+    if dry_run:
+        console.print("\n[bold yellow]🔍 Dry run — showing what would be restored:[/]")
+        result = diff_soul(package_path=target, workspace=ws)
+        _print_diff(result, show_full=False)
+        return
+
+    if not force:
+        if not click.confirm(f"\n⏪ Restore workspace to this snapshot?"):
+            console.print("[yellow]Cancelled.[/]")
+            return
+
+    try:
+        summary = absorb_soul(
+            package_path=target,
+            target_workspace=ws,
+            force=True,
+        )
+
+        console.print(f"\n[bold green]✅ Rollback complete![/]")
+        console.print(f"  Files restored: {summary['files_written']}")
+        if summary.get("conflicts"):
+            console.print(f"  [yellow]Skipped: {len(summary['conflicts'])}[/]")
+        console.print()
+
+    except (FileNotFoundError, ValueError) as e:
+        console.print(f"[bold red]❌ {e}[/]")
+        sys.exit(1)
 
 
 @main.command()

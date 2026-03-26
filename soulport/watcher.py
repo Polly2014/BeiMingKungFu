@@ -24,6 +24,42 @@ DEFAULT_INTERVAL_SECONDS = 6 * 3600  # 6 hours
 DEFAULT_KEEP = 10
 
 
+def find_snapshot_by_hash(snapshot_dir: Path, hash_prefix: str) -> Optional[Path]:
+    """Find a snapshot whose content_hash starts with the given prefix."""
+    if not snapshot_dir.exists():
+        return None
+    for bm_file in snapshot_dir.glob("*.bm"):
+        try:
+            manifest = _read_manifest(bm_file)
+            if manifest.content_hash.startswith(hash_prefix):
+                return bm_file
+        except (ValueError, OSError):
+            continue
+    return None
+
+
+def list_snapshots(snapshot_dir: Path) -> list[dict]:
+    """List all snapshots with metadata, newest first."""
+    if not snapshot_dir.exists():
+        return []
+    results = []
+    for bm_file in sorted(snapshot_dir.glob("*.bm"), key=lambda p: p.stat().st_mtime, reverse=True):
+        try:
+            manifest = _read_manifest(bm_file)
+            results.append({
+                "path": bm_file,
+                "name": bm_file.name,
+                "content_hash": manifest.content_hash,
+                "parent_hash": manifest.parent_hash,
+                "exported_at": manifest.exported_at,
+                "agent_name": manifest.agent_name,
+                "size": bm_file.stat().st_size,
+            })
+        except (ValueError, OSError):
+            continue
+    return results
+
+
 def workspace_fingerprint(workspace: Path) -> str:
     """Compute a fast fingerprint of workspace content (file paths + sizes + mtimes)."""
     import hashlib
