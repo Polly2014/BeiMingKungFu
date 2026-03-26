@@ -420,20 +420,33 @@ def changelog_cmd(snapshot_dir, count, full):
               help="Overwrite existing files without asking")
 @click.option("--dry-run", is_flag=True, default=False,
               help="Preview what would be restored without writing")
-def rollback(hash_prefix, workspace, snapshot_dir, force, dry_run):
+@click.option("--no-backup", is_flag=True, default=False,
+              help="Skip creating a pre-rollback backup snapshot")
+def rollback(hash_prefix, workspace, snapshot_dir, force, dry_run, no_backup):
     """⏪ Rollback workspace to a previous snapshot by hash prefix.
 
     Example: soulport rollback 1be975f7
     """
     console.print(BANNER)
 
-    from .watcher import DEFAULT_SNAPSHOT_DIR, find_snapshot_by_hash, list_snapshots
+    from .watcher import (
+        DEFAULT_SNAPSHOT_DIR, find_snapshot_by_hash, list_snapshots,
+        take_snapshot, get_parent_hash,
+    )
 
     snap_dir = Path(snapshot_dir) if snapshot_dir else DEFAULT_SNAPSHOT_DIR
     ws = Path(workspace) if workspace else None
 
     # Find matching snapshot
-    target = find_snapshot_by_hash(snap_dir, hash_prefix)
+    try:
+        target = find_snapshot_by_hash(snap_dir, hash_prefix)
+    except ValueError as e:
+        console.print(f"[bold red]❌ {e}[/]")
+        console.print("\n[bold]Available snapshots:[/]")
+        for s in list_snapshots(snap_dir)[:5]:
+            console.print(f"  [dim]{s['content_hash'][:12]}[/] {s['name']} ({s['exported_at'][:19]})")
+        sys.exit(1)
+
     if target is None:
         console.print(f"[bold red]❌ No snapshot found matching hash prefix: {hash_prefix}[/]")
         console.print("\n[bold]Available snapshots:[/]")
@@ -456,6 +469,16 @@ def rollback(hash_prefix, workspace, snapshot_dir, force, dry_run):
             return
 
     try:
+        # Safety: create a pre-rollback backup before overwriting
+        if not no_backup:
+            from .scanner import find_openclaw_workspace
+            backup_ws = Path(workspace) if workspace else find_openclaw_workspace()
+            if backup_ws:
+                parent_hash = get_parent_hash(snap_dir)
+                backup = take_snapshot(backup_ws, snap_dir, parent_hash, skip_if_unchanged=False)
+                if backup:
+                    console.print(f"[dim]💾 Pre-rollback backup saved: {backup.name}[/]")
+
         summary = absorb_soul(
             package_path=target,
             target_workspace=ws,
@@ -605,12 +628,14 @@ def _print_doctor_report(report: DoctorReport):
 
 STATUS_COLORS = {
     "added": "green",
+    "removed": "red",
     "ws_only": "dim",
     "modified": "yellow",
     "unchanged": "dim",
 }
 STATUS_SYMBOLS = {
     "added": "+",
+    "removed": "-",
     "ws_only": "◦",
     "modified": "~",
     "unchanged": "=",

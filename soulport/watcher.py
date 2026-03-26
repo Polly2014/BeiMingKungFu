@@ -25,16 +25,28 @@ DEFAULT_KEEP = 10
 
 
 def find_snapshot_by_hash(snapshot_dir: Path, hash_prefix: str) -> Optional[Path]:
-    """Find a snapshot whose content_hash starts with the given prefix."""
+    """Find a snapshot whose content_hash starts with the given prefix.
+    
+    Returns the matching path, or None if not found.
+    Raises ValueError if the prefix is ambiguous (matches multiple snapshots).
+    """
     if not snapshot_dir.exists():
         return None
+    matches = []
     for bm_file in snapshot_dir.glob("*.bm"):
         try:
             manifest = _read_manifest(bm_file)
             if manifest.content_hash.startswith(hash_prefix):
-                return bm_file
+                matches.append(bm_file)
         except (ValueError, OSError):
             continue
+    if len(matches) == 1:
+        return matches[0]
+    elif len(matches) > 1:
+        raise ValueError(
+            f"Ambiguous hash prefix '{hash_prefix}' matches {len(matches)} snapshots. "
+            "Use a longer prefix."
+        )
     return None
 
 

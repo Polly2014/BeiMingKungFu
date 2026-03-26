@@ -387,7 +387,7 @@ def _update_manifest_in_archive(archive_path: Path, manifest: Manifest):
 class FileDiff:
     """Diff result for a single file."""
     rel_path: str
-    status: str     # "added", "removed", "modified", "unchanged"
+    status: str     # "added", "removed", "modified", "unchanged", "ws_only"
     layer: str      # which soul layer it belongs to
     pkg_size: int = 0
     ws_size: int = 0
@@ -411,8 +411,7 @@ class SoulDiff:
     
     @property
     def removed(self) -> list[FileDiff]:
-        """Alias for ws_only, kept for backward compat."""
-        return self.ws_only
+        return [d for d in self.file_diffs if d.status == "removed"]
     
     @property
     def modified(self) -> list[FileDiff]:
@@ -545,8 +544,9 @@ def diff_packages(old_path: Path, new_path: Path) -> SoulDiff:
                 pkg_size=len(new_files[rel_path]),
             ))
         elif in_old and not in_new:
+            # In package-vs-package context, this file was truly removed
             result.file_diffs.append(FileDiff(
-                rel_path=rel_path, status="ws_only", layer=layer,
+                rel_path=rel_path, status="removed", layer=layer,
                 ws_size=len(old_files[rel_path]),
             ))
         elif in_old and in_new:
@@ -606,6 +606,8 @@ def changelog(
 
     entries = []
     for old_bm, new_bm in reversed(pairs):
+        # Read manifests here (diff_packages reads them again internally;
+        # acceptable overhead for clean separation — optimize if profiling shows need)
         old_manifest = _read_manifest(old_bm)
         new_manifest = _read_manifest(new_bm)
         soul_diff = diff_packages(old_bm, new_bm)
@@ -615,8 +617,7 @@ def changelog(
         for d in soul_diff.file_diffs:
             if d.layer not in layer_summary:
                 layer_summary[d.layer] = {"added": 0, "removed": 0, "modified": 0, "unchanged": 0}
-            key = "removed" if d.status == "ws_only" else d.status
-            layer_summary[d.layer][key] += 1
+            layer_summary[d.layer][d.status] += 1
 
         entries.append({
             "old_name": old_bm.name,
