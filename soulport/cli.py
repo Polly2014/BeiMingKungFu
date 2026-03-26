@@ -15,6 +15,7 @@ from rich.tree import Tree
 
 from . import __version__
 from .core import absorb_soul, export_soul, inspect_soul, merge_souls
+from .doctor import DoctorReport, check_soul_health
 from .manifest import Manifest
 
 # Ensure UTF-8 output on Windows
@@ -221,6 +222,24 @@ def merge(packages, output):
         sys.exit(1)
 
 
+@main.command()
+@click.option("--workspace", "-w", type=click.Path(exists=True), default=None,
+              help="Agent workspace path (auto-detects OpenClaw)")
+def doctor(workspace):
+    """🩺 Check your agent's soul health across all five layers."""
+    console.print(BANNER)
+
+    from .scanner import find_openclaw_workspace
+
+    ws = Path(workspace) if workspace else find_openclaw_workspace()
+    if ws is None:
+        console.print("[bold red]❌ Cannot find OpenClaw workspace. Use --workspace to specify.[/]")
+        sys.exit(1)
+
+    report = check_soul_health(ws)
+    _print_doctor_report(report)
+
+
 # ── Display helpers ────────────────────────────────────────────────
 
 LAYER_EMOJIS = {
@@ -274,6 +293,58 @@ def _print_manifest(manifest: Manifest, title: str = "Soul Package"):
     
     console.print(tree)
     console.print(f"[dim]Total: {total_files} files, {_format_bytes(total_bytes)}[/]")
+
+
+STATUS_ICONS = {"ok": "[green]✅[/]", "warn": "[yellow]⚠️[/]", "missing": "[red]❌[/]"}
+
+
+def _print_doctor_report(report: DoctorReport):
+    """Pretty-print a doctor report."""
+
+    # Header
+    score = report.health_score
+    if score >= 80:
+        score_color = "green"
+    elif score >= 50:
+        score_color = "yellow"
+    else:
+        score_color = "red"
+
+    header = Table.grid(padding=(0, 2))
+    header.add_row("Agent", f"[bold]{report.agent_name}[/]")
+    header.add_row("Workspace", f"[dim]{report.workspace}[/]")
+    header.add_row("Health", f"[bold {score_color}]{score}/100[/]")
+    header.add_row(
+        "Summary",
+        f"[green]{report.ok_count} ok[/] · [yellow]{report.warn_count} warn[/] · [red]{report.missing_count} missing[/]",
+    )
+    console.print(Panel(header, title="[bold]🩺 Soul Health Check[/]", border_style="cyan"))
+
+    # Per-layer results
+    current_layer = None
+    for check in report.checks:
+        if check.layer != current_layer:
+            current_layer = check.layer
+            emoji = LAYER_EMOJIS.get(current_layer, "📄")
+            console.print(f"\n{emoji} [bold]{current_layer.title()}[/]")
+
+        icon = STATUS_ICONS.get(check.status, "❓")
+        console.print(f"  {icon} {check.name} — {check.detail}")
+        if check.suggestion:
+            console.print(f"      [dim]→ {check.suggestion}[/]")
+
+    # Footer with encouragement
+    console.print()
+    if score == 100:
+        console.print("[bold green]🌊 Perfect soul! Your agent is a 北冥-level entity.[/]")
+    elif score >= 80:
+        console.print("[bold green]🦅 Healthy soul! A few tweaks and you'll be at 100.[/]")
+    elif score >= 50:
+        console.print("[bold yellow]🐋 Growing soul. Fill in the gaps to level up.[/]")
+    else:
+        console.print("[bold red]🥚 Newborn soul. Lots of room to grow![/]")
+
+    console.print(f"\n[dim]See your soul's portrait at[/] [bold]soul.polly.wang[/]\n")
 
 
 if __name__ == "__main__":
