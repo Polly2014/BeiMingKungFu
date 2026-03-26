@@ -1,14 +1,14 @@
-# CLAUDE.md — SoulPort
+# CLAUDE.md - SoulPort
 
 ## Project Overview
 
-AI Agent 灵魂的标准格式与工具链 — 导出、吸收、合并、监控 Agent 的记忆/人格/技能/配置。
+AI Agent 灵魂的标准格式与工具链 - 导出、吸收、合并、监控 Agent 的记忆/人格/技能/配置。
 
 核心理念：**`.bm` 是 Agent 灵魂的标准格式，CLI 只是第一个消费者。**
 
-> 为什么是独立工具而不是框架内置功能？SoulPort 不只是迁移——它定义了 Agent 灵魂的跨框架标准。迁移是第一个用例，评估（SoulArena）、融合、版本控制、跨框架互操作是后续用例。这些不该被锁在某一个框架里。
+> 为什么是独立工具而不是框架内置功能？SoulPort 不只是迁移--它定义了 Agent 灵魂的跨框架标准。迁移是第一个用例，评估（SoulArena）、融合、版本控制、跨框架互操作是后续用例。这些不该被锁在某一个框架里。
 
-> 前身为“北冥神功 (BeiMingKungFu)”，v0.2.0 起正式更名为 **SoulPort** —— Soul + Port(able)。
+> 前身为"北冥神功 (BeiMingKungFu)"，v0.2.0 起正式更名为 **SoulPort** -- Soul + Port(able)。
 
 ## Commands
 
@@ -64,20 +64,48 @@ SoulPort/                         # (原 BeiMingKungFu/)
 ## .bm 文件格式
 
 压缩归档 (tar.gz)，包含:
-- `manifest.json` — 元数据、版本、来源、内容哈希
-- `workspace/` — Agent 工作区文件
-- `config/` — 脱敏后的系统配置
-- `signature` — 完整性校验
+- `manifest.json` - 元数据、版本、来源、内容哈希
+- `workspace/` - Agent 工作区文件
+- `config/` - 脱敏后的系统配置
+- `signature` - 完整性校验
 
 ## 相关项目
 
-- **OpenClaw** (`X-Workspace/openclaw/`) — SoulPort 的首要适配目标
-- **TideWatch** (`X-Workspace/TideWatch-MCP-Server/`) — 通过 OpenClaw MCP 接入
-- **SoulArena** (`X-Workspace/SoulArena/`) — 灵魂竞技场 Web 平台
+- **OpenClaw** (`X-Workspace/openclaw/`) - SoulPort 的首要适配目标
+- **TideWatch** (`X-Workspace/TideWatch-MCP-Server/`) - 通过 OpenClaw MCP 接入
+- **SoulArena** (`X-Workspace/SoulArena/`) - 灵魂竞技场 Web 平台
+
+## Target Users
+
+- **P0: 多机器开发者** - 家/公司/VPS 跑同一个 agent，灵魂需要同步（换电脑不失忆）
+- **P1: 框架切换者** - Cursor → OpenClaw、Claude Desktop → Windsurf，不想从零开始
+- **P2: Agent 社区贡献者** - 分享带故事的 skill（"这个翻译技能是连续翻译5本书进化出来的"）
+- **P3: Agent 爱好者/围观群众** - SoulArena 上传灵魂看画像、排行、PK（轻度用户，传播主力）
+
+## Competitive Landscape
+
+目前无直接竞品。各框架有零散的 import/export（OpenClaw 的 workspace 文件、Cursor 的 .cursorrules），但都是框架锁定的单层文件，没有跨框架标准，没有五层抽象，没有灵魂评估。
+
+最接近的类比是 **dotfiles 管理器**（stow / chezmoi / yadm）--但它们管的是 shell 配置不是 agent 灵魂，没有记忆/人格/技能的语义层。
+
+护城河不在 CLI 代码本身（954行谁都能写），而在：
+1. **`.bm` 格式的先发标准** - 第一个定义 agent 灵魂标准格式的人拿走生态位
+2. **SoulArena 社交飞轮** - 上传 → 画像 → 分享 → 更多上传，数据壁垒
+3. **跨框架适配网络效应** - 支持的框架越多，迁移路径越多，价值越大
+4. **LLM-assisted merge（v0.6）** - 语义级灵魂融合，纯工程抄不走
+
+## Success Metrics
+
+| 阶段 | 指标 | 目标 |
+|------|------|------|
+| v0.2 | PyPI weekly downloads | 100+ |
+| v0.4 | SoulArena 灵魂上传数 | 50+ |
+| v0.6 | GitHub stars | 200+ |
+| v1.0 | 支持框架数 | 3+ |
 
 ## Roadmap
 
-### v0.1.0 ✅ MVP (2026-03-25) — as BeiMingKungFu
+### v0.1.0 ✅ MVP (2026-03-25) - as BeiMingKungFu
 - [x] export / absorb / merge / inspect 四件套
 - [x] 灵魂五层架构（Identity/Memory/Config/Skills/System）
 - [x] API Key 自动脱敏 (`__BEIMING_REDACTED__`)
@@ -92,32 +120,32 @@ SoulPort/                         # (原 BeiMingKungFu/)
 - [x] 脱敏标记：`__SOULPORT_REDACTED__`
 - [x] Skill 扫描修复：只统计自定义 skill，不含内置
 
-### v0.2.x — 打磨核心体验
-- [ ] `soulport diff` — absorb 前内容级别差异对比
-- [ ] `soulport doctor` — 灵魂健康检查（五层完整性 + 建议）
-- [ ] 选择性 absorb 交互 — Rich 选择器，逐层勾选
-- [ ] 修 P1-4 glob 匹配 — `_matches_pattern` 的 `**` 边界 case 收紧
+### v0.2.x - 打磨核心体验
+- [ ] `soulport diff` - absorb 前内容级别差异对比
+- [ ] `soulport doctor` - 灵魂健康检查（五层完整性 + 建议）
+- [ ] 选择性 absorb 交互 - Rich 选择器，逐层勾选
+- [ ] 修 P1-4 glob 匹配 - `_matches_pattern` 的 `**` 边界 case 收紧
 
-### v0.3 — 日活基础
-- [ ] `soulport watch` — 守护进程，自动定期备份（每天/每6h/on-change）
-- [ ] `soulport changelog` — 对比快照，生成灵魂变更日志
-- [ ] 灵魂谱系 (Soul Lineage) — 每个 .bm 记录 parent hash，形成族谱
-- [ ] 配合 `soulport rollback` 实现灵魂版本控制
+### v0.3 - 日活基础
+- [ ] `soulport watch` - 守护进程，自动定期备份（每天/每6h/on-change via fsnotify）
+- [ ] `soulport changelog` - 对比快照，生成灵魂变更日志（`--narrative` 让 LLM 写人话摘要）
+- [ ] 灵魂谱系 (Soul Lineage) - manifest.json 新增 `parent_hash` 字段，指向上次 export 的 content_hash，形成族谱链
+- [ ] `soulport rollback <hash>` - 回滚到指定快照，配合 watch 实现灵魂版本控制
 
-### v0.4 — MCP + 社交
-- [ ] SoulPort MCP Server — 让 Agent 自己备份自己（soulport_export/diff/doctor 作为 MCP 工具）
-- [ ] SoulArena PNG 导出 — og:image 社交分享基础设施
-- [ ] 灵魂碑片 (Soul Shards) — 按层选择性导出/分享
+### v0.4 - MCP + 社交
+- [ ] SoulPort MCP Server - 让 Agent 自己备份自己（soulport_export/diff/doctor 作为 MCP 工具）
+- [ ] SoulArena PNG 导出 - og:image 社交分享基础设施
+- [ ] 灵魂碑片 (Soul Shards) - 按层选择性导出/分享
 
-### v0.5 — 加密 + 云传输
-- [ ] `--encrypt` — `cryptography.Fernet` 对称加密
+### v0.5 - 加密 + 云传输
+- [ ] `--encrypt` - `cryptography.Fernet` 对称加密
 - [ ] 云传输（push/pull/QR）
 
-### v0.6 — 智能合并（护城河）
-- [ ] LLM-assisted merge — 合并 MEMORY.md 时调 LLM 做语义去重 + 时间线整理
-- [ ] Identity fusion — 两个 SOUL.md 合并时 LLM 辅助生成融合人格
+### v0.6 - 智能合并（护城河）
+- [ ] LLM-assisted merge - 合并 MEMORY.md 时调 LLM 做语义去重 + 时间线整理
+- [ ] Identity fusion - 两个 SOUL.md 合并时 LLM 辅助生成融合人格
 
-### v1.0 — 跨框架
+### v1.0 - 跨框架
 - [ ] Claude Desktop adapter (P0, 用户量最大)
 - [ ] Cursor adapter (P1, .cursorrules)
 - [ ] `soulport convert --from cursor --to openclaw`
@@ -125,9 +153,9 @@ SoulPort/                         # (原 BeiMingKungFu/)
 
 ### 🚀 远期
 - [x] **Soul Arena** — Agent 灵魂评估 + 社交平台（`soul.polly.wang`）
-- [ ] 灵魂 DNA 指纹 — 程序化生成唯一视觉身份
-- [ ] `soulport resume` — 为 Agent 生成“简历”
-- [ ] 多 agent 灵魂网络 — A/B/C 记忆技能互通共享
+- [ ] 灵魂 DNA 指纹 — 基于五维评分+记忆关键词的程序化唯一视觉身份（替代通用雷达图，增强分享卡片辨识度）
+- [ ] `soulport resume` — 为 Agent 生成"简历"（经验/技能/性格/亮点，类比人类求职简历）
+- [ ] 多 agent 灵魂网络 — A/B/C 记忆技能互通共享（带权限控制）
 
 ### 冰箱
-- 雪球式 Agent 成长追踪 — 定期 export 自动对比成长曲线
+_当前为空 — v0.3 watch+changelog+lineage 覆盖了原"雪球式成长追踪"需求_
