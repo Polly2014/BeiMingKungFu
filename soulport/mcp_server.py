@@ -225,10 +225,10 @@ def soulport_status(
     else:
         lines.append("Agent: (workspace not found)")
 
-    # Health score
+    # Health score (lightweight — for details use soulport_doctor)
     if ws:
         report = check_soul_health(ws)
-        lines.append(f"Health: {report.health_score}/100")
+        lines.append(f"Health: {report.health_score}/100 (use soulport_doctor for details)")
 
     # Snapshot info
     lines.append("")
@@ -276,7 +276,10 @@ def soulport_snapshot(
             cleanup_old_snapshots(snap_dir, keep=10)
             return f"✅ Snapshot saved: {result.name}"
         else:
-            return "⏭️ No changes since last snapshot — skipped."
+            # Give Agent context for why it was skipped
+            latest = get_latest_snapshot(snap_dir)
+            latest_info = f" (latest: {latest.name})" if latest else ""
+            return f"⏭️ No changes since last snapshot — skipped{latest_info}"
     except Exception as e:
         return f"❌ Snapshot failed: {e}"
 
@@ -295,6 +298,14 @@ def main():
     args = parser.parse_args()
 
     if args.http:
+        if args.host != "127.0.0.1":
+            import sys
+            print(
+                f"⚠️  WARNING: Binding to {args.host} exposes SoulPort MCP to the network.\n"
+                "   No authentication is configured. Consider adding API key middleware\n"
+                "   or using a reverse proxy with auth.",
+                file=sys.stderr,
+            )
         mcp.run(transport="streamable-http", host=args.host, port=args.port)
     else:
         mcp.run(transport="stdio")
