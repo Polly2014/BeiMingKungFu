@@ -138,9 +138,9 @@ SoulPort/                         # (原 BeiMingKungFu/)
 - [ ] 修 P1-4 glob 匹配 - `_matches_pattern` 的 `**` 边界 case 收紧
 
 ### v0.3 - 日活基础
-- [ ] `soulport watch` - 守护进程，自动定期备份（每天/每6h/on-change via fsnotify）
+- [x] `soulport watch` - 守护进程，自动定期备份（每天/每6h/on-change + skip-if-unchanged）
+- [x] 灵魂谱系 (Soul Lineage) - manifest.json `parent_hash` 字段，形成族谱链
 - [ ] `soulport changelog` - 对比快照，生成灵魂变更日志（`--narrative` 让 LLM 写人话摘要）
-- [ ] 灵魂谱系 (Soul Lineage) - manifest.json 新增 `parent_hash` 字段，指向上次 export 的 content_hash，形成族谱链
 - [ ] `soulport rollback <hash>` - 回滚到指定快照，配合 watch 实现灵魂版本控制
 
 ### v0.4 - MCP + 社交
