@@ -88,6 +88,9 @@ SoulPort/                         # (原 BeiMingKungFu/)
 - [x] PyPI 新包：`pip install soulport`
 - [x] CLI 命令：`beiming` → `soulport`
 - [x] 脱敏标记：`__SOULPORT_REDACTED__`
+- [x] Skill 扫描修复：只统计自定义 skill，不含内置
+
+### v0.2.x — 打磨核心体验
 - [ ] `soulport diff` — absorb 前内容级别差异对比
 - [ ] 选择性 absorb 交互 — Rich 选择器，逐层勾选
 - [ ] 修 P1-4 glob 匹配 — `_matches_pattern` 的 `**` 边界 case 收紧

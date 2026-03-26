@@ -206,8 +206,6 @@ def find_openclaw_skills() -> list[Path]:
     candidates = [
         # Workspace-relative (if workspace is inside openclaw project)
         home / ".openclaw",
-        # Common dev locations
-        home / "Downloads" / "Sublime_Workspace" / "Zola_Workspace" / "www.polly.com" / "X-Workspace" / "openclaw",
     ]
     
     # Strategy 2: Find openclaw via which/command
