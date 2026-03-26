@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "beimingkungfu"
-version = "0.1.0"
+name = "soulport"
+version = "0.2.0"
 description = "Agent soul transfer — export, absorb, and merge AI agent identities across machines"
 readme = "README.md"
 license = { text = "MIT" }
@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 authors = [
     { name = "Polly Wang" },
 ]
-keywords = ["ai", "agent", "migration", "openclaw", "mcp", "soul-transfer"]
+keywords = ["ai", "agent", "migration", "openclaw", "mcp", "soul-transfer", "soulport"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -26,11 +26,11 @@ dependencies = [
 ]
 
 [project.scripts]
-beiming = "beiming.cli:main"
+soulport = "soulport.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/Polly2014/BeiMingKungFu"
-Repository = "https://github.com/Polly2014/BeiMingKungFu"
+Homepage = "https://github.com/Polly2014/SoulPort"
+Repository = "https://github.com/Polly2014/SoulPort"
 
 [tool.hatch.build.targets.wheel]
-packages = ["beiming"]
+packages = ["soulport"]

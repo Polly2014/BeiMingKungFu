@@ -1,5 +1,5 @@
 """
-Beiming manifest schema — defines what's inside a .bm package.
+SoulPort manifest schema — defines what's inside a .bm package.
 """
 
 from dataclasses import dataclass, field
@@ -25,7 +25,7 @@ class Manifest:
     
     # Identity
     version: str = "1"                       # manifest schema version
-    beiming_version: str = "0.1.0"           # beiming tool version
+    soulport_version: str = "0.2.0"          # soulport tool version
     
     # Source
     agent_name: str = ""                     # e.g. "小龙虾"
@@ -47,7 +47,7 @@ class Manifest:
     def to_dict(self) -> dict:
         return {
             "version": self.version,
-            "beiming_version": self.beiming_version,
+            "soulport_version": self.soulport_version,
             "agent_name": self.agent_name,
             "source_host": self.source_host,
             "source_framework": self.source_framework,
@@ -78,7 +78,7 @@ class Manifest:
         ]
         return cls(
             version=data.get("version", "1"),
-            beiming_version=data.get("beiming_version", "0.1.0"),
+            soulport_version=data.get("soulport_version") or data.get("beiming_version", "0.2.0"),
             agent_name=data.get("agent_name", ""),
             source_host=data.get("source_host", ""),
             source_framework=data.get("source_framework", "openclaw"),

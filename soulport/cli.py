@@ -1,5 +1,5 @@
 """
-Beiming CLI — command-line interface for soul transfer operations.
+SoulPort CLI — command-line interface for soul transfer operations.
 """
 
 import os
@@ -36,17 +36,17 @@ def _format_bytes(n: int) -> str:
 
 
 BANNER = """[bold cyan]
-  ╔══════════════════════════════════════════╗
-  ║  🌊 Beiming (北冥) — Agent Soul Transfer ║
-  ╚══════════════════════════════════════════╝[/]
-  [dim]"北冥有鱼，其名为鲲。化而为鸟，其名为鹏。"[/]
+  ╔════════════════════════════════════════╗
+  ║  🚀 SoulPort — Agent Soul Transfer    ║
+  ╚════════════════════════════════════════╝[/]
+  [dim]Your agent's soul is portable.[/]
 """
 
 
 @click.group()
-@click.version_option(__version__, prog_name="beiming")
+@click.version_option(__version__, prog_name="soulport")
 def main():
-    """🌊 Beiming — Agent Soul Transfer
+    """🚀 SoulPort — Agent Soul Transfer
 
     Export, absorb, and merge AI agent identities across machines.
     """
@@ -95,7 +95,7 @@ def export(workspace, output, name, include_projects, no_config):
                 console.print(f"  [dim]• {field}[/]")
         
         console.print(f"\n[dim]Transfer this file to another machine and run:[/]")
-        console.print(f"[bold]  beiming absorb {result.name}[/]\n")
+        console.print(f"[bold]  soulport absorb {result.name}[/]\n")
         
     except FileNotFoundError as e:
         console.print(f"[bold red]❌ {e}[/]")
@@ -242,7 +242,7 @@ def _print_manifest(manifest: Manifest, title: str = "Soul Package"):
     header.add_row("From", f"{manifest.source_host}")
     header.add_row("Framework", manifest.source_framework)
     header.add_row("Exported", manifest.exported_at[:19] if manifest.exported_at else "—")
-    header.add_row("Beiming", f"v{manifest.beiming_version}")
+    header.add_row("SoulPort", f"v{manifest.soulport_version}")
     
     if manifest.content_hash:
         header.add_row("Hash", f"[dim]{manifest.content_hash[:16]}...[/]")

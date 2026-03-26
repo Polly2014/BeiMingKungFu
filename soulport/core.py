@@ -1,5 +1,5 @@
 """
-Beiming core operations — export, absorb, merge, inspect.
+SoulPort core operations — export, absorb, merge, inspect.
 """
 
 import hashlib
@@ -60,7 +60,7 @@ def export_soul(
     
     # Build manifest
     manifest = Manifest(
-        beiming_version=__version__,
+        soulport_version=__version__,
         agent_name=agent_name,
         source_host=platform.node(),
         source_framework="openclaw",
@@ -254,14 +254,14 @@ def merge_souls(
     
     try:
         for pkg in packages:
-            tmp = tempfile.mkdtemp(prefix="beiming-merge-")
+            tmp = tempfile.mkdtemp(prefix="soulport-merge-")
             temp_dirs.append(tmp)
             with tarfile.open(pkg, "r:gz") as tar:
                 tar.extractall(tmp, filter="data")
             manifests.append(_read_manifest(pkg))
         
         # Merge workspace files
-        merged_workspace = Path(tempfile.mkdtemp(prefix="beiming-merged-ws-"))
+        merged_workspace = Path(tempfile.mkdtemp(prefix="soulport-merged-ws-"))
         
         for i, (tmp, manifest) in enumerate(zip(temp_dirs, manifests)):
             ws_dir = Path(tmp) / "workspace"
@@ -299,7 +299,7 @@ def merge_souls(
         
         primary = manifests[0]
         merged_manifest = Manifest(
-            beiming_version=__version__,
+            soulport_version=__version__,
             agent_name=primary.agent_name,
             source_host=f"merged({', '.join(m.source_host for m in manifests)})",
             source_framework=primary.source_framework,

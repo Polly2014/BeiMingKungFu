@@ -1,5 +1,5 @@
 """
-Beiming scanner — discovers agent workspace files and categorizes them into layers.
+SoulPort scanner — discovers agent workspace files and categorizes them into layers.
 """
 
 import os
@@ -72,7 +72,7 @@ def redact_config(config: dict, path: str = "") -> tuple[dict, list[str]]:
             redacted[key] = sub_redacted
             redacted_paths.extend(sub_paths)
         elif is_sensitive_key(key) and isinstance(value, str) and value:
-            redacted[key] = "__BEIMING_REDACTED__"
+            redacted[key] = "__SOULPORT_REDACTED__"
             redacted_paths.append(current_path)
         else:
             redacted[key] = value
