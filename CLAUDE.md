@@ -63,11 +63,13 @@ SoulPort/                         # (原 BeiMingKungFu/)
 
 ## .bm 文件格式
 
+> `.bm` — originally named after 北冥 (BěiMíng), the mythical Northern Sea from Zhuangzi's *"Wandering Beyond"*, where a fish transforms into a bird. A soul's form is free.
+
 压缩归档 (tar.gz)，包含:
-- `manifest.json` - 元数据、版本、来源、内容哈希
-- `workspace/` - Agent 工作区文件
-- `config/` - 脱敏后的系统配置
-- `signature` - 完整性校验
+- `manifest.json` — 元数据、版本、来源、内容哈希
+- `workspace/` — Agent 工作区文件
+- `config/` — 脱敏后的系统配置
+- `signature` — 完整性校验
 
 ## 相关项目
 

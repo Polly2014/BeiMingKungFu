@@ -71,6 +71,8 @@ SoulPort packages are `.bm` files — a compressed archive containing:
 - `config/` — sanitized system configuration
 - `signature` — integrity verification
 
+> **Why `.bm`?** Named after 北冥 (BěiMíng) — the mythical Northern Sea from Zhuangzi's *"Wandering Beyond"* (逍遥游), where a fish transforms into a bird. A soul's form is free.
+
 ## License
 
 MIT
