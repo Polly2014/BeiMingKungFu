@@ -1,22 +1,22 @@
 """
-SoulPort semantic merge — LLM-assisted cognitive state reconciliation.
+SoulPort semantic merge — four-layer cognitive state reconciliation.
 
-Uses LLM to intelligently merge divergent agent memories, identities,
-and configurations. This is the core differentiator (Patent Claim Group E).
+Four-layer filter pipeline (Patent Claim Group E):
+  Layer 1 (file):    diff_packages() → added/removed/unchanged skip LLM
+  Layer 2 (section): _split_sections() → identical/new sections skip LLM
+  Layer 3 (line):    _classify_diff() → pure append/tiny changes skip LLM
+  Layer 4 (LLM):     only true semantic conflicts reach the model
 
-Merge decision matrix:
-- File only in A → keep as-is (zero LLM)
-- File only in B → keep as-is (zero LLM)
-- Both identical  → keep as-is (zero LLM)
-- Both different + Memory/Identity → LLM semantic merge
-- Both different + Config → LLM merge
-- Both different + Skills → keep newer version (by content length)
+Each layer eliminates cases that don't need semantic understanding.
+LLM is the last resort, not the first tool.
 """
 
 from __future__ import annotations
 
 import asyncio
+import difflib
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -74,23 +74,25 @@ class SemanticMergeReport:
         return counts
 
 
-SECTION_MERGE_PROMPT = """Two versions of a markdown section have diverged.
+DIFF_MERGE_PROMPT = """A markdown section has conflicting changes between two versions.
 File: "{filename}", Section: "{section_title}"
 
-=== VERSION A ===
-{text_a}
+Here is the unified diff (- = version A, + = version B):
+```diff
+{unified_diff}
+```
 
-=== VERSION B ===
+Version B (the newer version):
 {text_b}
 
 Merge rules:
-1. Deduplicate semantically equivalent content
-2. Keep the more detailed/recent version when both describe the same thing
-3. Preserve unique details from both
-4. Maintain the original markdown format
-5. Output ONLY the merged section content (no extra commentary)
+1. Start from version B as the base
+2. Incorporate any unique additions from version A (shown as - lines) that aren't superseded by B
+3. Deduplicate semantically equivalent content
+4. Preserve chronological order
+5. Output ONLY the merged section content
 
-At the very end, add: <!-- merge: [brief description of decisions] -->
+At the very end, add: <!-- merge: [brief description] -->
 
 Output:"""
 
@@ -142,16 +144,12 @@ async def merge_file_semantic(
     source_b: str,
     config: LLMConfig,
 ) -> MergeResult:
-    """Merge a single file using LLM if needed."""
+    """Merge a single MODIFIED file using Layers 2-4.
+    
+    Called only for files that Layer 1 identified as 'modified' (both exist, different content).
+    """
 
-    # Identical → no merge needed
-    if content_a == content_b:
-        return MergeResult(
-            rel_path=rel_path, strategy="identical", layer=layer,
-            content=content_a,
-        )
-
-    # Skills → keep version B (assumed newer in merge order, not by length)
+    # Skills → keep version B (assumed newer in merge order)
     # Future: compare manifest exported_at timestamps for more accurate selection
     if layer == "skills":
         return MergeResult(
@@ -193,7 +191,7 @@ async def merge_file_semantic(
                 merge_note=f"> \u26a0\ufe0f LLM fusion failed: {e}. Kept version B.",
             )
 
-    # Memory + Config: section-level diff, only send changed sections to LLM
+    # Memory + Config: Layer 2 (section) + Layer 3 (line) + Layer 4 (LLM)
     sections_a = _split_sections(text_a)
     sections_b = _split_sections(text_b)
 
@@ -206,6 +204,7 @@ async def merge_file_semantic(
         sa = sections_a.get(title, "")
         sb = sections_b.get(title, "")
 
+        # Layer 2: Section-level filter
         if sa == sb:
             merged_sections.append(sb if sb else sa)
         elif not sa:
@@ -215,20 +214,45 @@ async def merge_file_semantic(
             merged_sections.append(sa)
             merge_notes.append(f"+A: {title}")
         else:
-            # Both have this section but different — send to LLM
-            prompt = SECTION_MERGE_PROMPT.format(
-                filename=rel_path, section_title=title,
-                text_a=sa, text_b=sb,
-            )
-            try:
-                merged_text = await _call_llm(prompt, config)
-                merged_sections.append(merged_text)
-                llm_used = True
-                merge_notes.append(f"LLM: {title}")
-            except Exception as e:
-                # Fallback: keep version B for this section
+            # Layer 3: Line-level classification
+            diff_class, diff_text = _classify_diff(sa, sb)
+
+            if diff_class == "pure_append":
+                # B is a superset of A — just keep B
                 merged_sections.append(sb)
-                merge_notes.append(f"fail({title}): {e}")
+                merge_notes.append(f"append: {title}")
+            elif diff_class == "tiny":
+                # < 5 lines changed — not worth LLM, keep B
+                merged_sections.append(sb)
+                merge_notes.append(f"tiny→B: {title}")
+            elif diff_class == "medium":
+                # Layer 4: LLM with unified diff (small prompt)
+                prompt = DIFF_MERGE_PROMPT.format(
+                    filename=rel_path, section_title=title,
+                    unified_diff=diff_text, text_b=sb,
+                )
+                try:
+                    merged_text = await _call_llm(prompt, config)
+                    merged_sections.append(merged_text)
+                    llm_used = True
+                    merge_notes.append(f"LLM(diff): {title}")
+                except Exception as e:
+                    merged_sections.append(sb)
+                    merge_notes.append(f"fail→B: {title}")
+            else:  # "large" — > 50% different
+                # Layer 4: LLM with both full sections
+                prompt = DIFF_MERGE_PROMPT.format(
+                    filename=rel_path, section_title=title,
+                    unified_diff=diff_text, text_b=sb,
+                )
+                try:
+                    merged_text = await _call_llm(prompt, config)
+                    merged_sections.append(merged_text)
+                    llm_used = True
+                    merge_notes.append(f"LLM(full): {title}")
+                except Exception as e:
+                    merged_sections.append(sb)
+                    merge_notes.append(f"fail→B: {title}")
 
     final_text = "\n\n".join(merged_sections)
     note = "; ".join(merge_notes) if merge_notes else "all sections identical"
@@ -270,6 +294,45 @@ def _split_sections(text: str) -> dict[str, str]:
     return sections
 
 
+def _classify_diff(text_a: str, text_b: str) -> tuple[str, str]:
+    """Layer 3: Classify the line-level difference between two text sections.
+    
+    Returns (classification, unified_diff_text):
+    - "pure_append": B contains everything in A plus more (zero LLM needed)
+    - "tiny": < 5 lines changed (not worth LLM, keep B)
+    - "medium": 5-50% of lines differ (send unified diff to LLM)
+    - "large": > 50% of lines differ (send both versions to LLM)
+    """
+    lines_a = text_a.splitlines(keepends=True)
+    lines_b = text_b.splitlines(keepends=True)
+
+    # Check pure append: B starts with A's content
+    if text_b.startswith(text_a.rstrip()):
+        return "pure_append", ""
+
+    # Generate unified diff
+    diff_lines = list(difflib.unified_diff(
+        lines_a, lines_b, fromfile="A", tofile="B", n=2
+    ))
+    diff_text = "".join(diff_lines)
+
+    # Count actual changes (ignore diff headers)
+    added = sum(1 for l in diff_lines if l.startswith("+") and not l.startswith("+++"))
+    removed = sum(1 for l in diff_lines if l.startswith("-") and not l.startswith("---"))
+    total_changes = added + removed
+
+    if total_changes < 5:
+        return "tiny", diff_text
+
+    total_lines = max(len(lines_a), len(lines_b), 1)
+    change_ratio = total_changes / total_lines
+
+    if change_ratio > 0.5:
+        return "large", diff_text
+    else:
+        return "medium", diff_text
+
+
 async def semantic_merge_packages(
     files_a: dict[str, bytes],
     files_b: dict[str, bytes],
@@ -278,14 +341,18 @@ async def semantic_merge_packages(
     source_b: str = "source-B",
     config: Optional[LLMConfig] = None,
 ) -> SemanticMergeReport:
-    """Merge all files from two packages using semantic strategies."""
+    """Merge all files using four-layer filter pipeline.
+    
+    Layer 1 (file): classify files as added/removed/unchanged/modified
+    Layers 2-4: handled inside merge_file_semantic() for modified files
+    """
     if config is None:
         config = load_llm_config()
 
     report = SemanticMergeReport()
     all_paths = sorted(set(files_a.keys()) | set(files_b.keys()))
 
-    # Separate into LLM-needed and no-LLM
+    # Layer 1: File-level classification (replaces manual comparison)
     tasks = []
     for rel_path in all_paths:
         in_a = rel_path in files_a
@@ -302,14 +369,20 @@ async def semantic_merge_packages(
                 rel_path=rel_path, strategy="keep_b", layer=layer,
                 content=files_b[rel_path],
             ))
-        elif in_a and in_b:
-            # Need merge — may or may not call LLM
+        elif files_a[rel_path] == files_b[rel_path]:
+            # Layer 1 filter: identical files → skip entirely
+            report.results.append(MergeResult(
+                rel_path=rel_path, strategy="identical", layer=layer,
+                content=files_a[rel_path],
+            ))
+        else:
+            # Modified file → Layers 2-4 inside merge_file_semantic
             tasks.append(merge_file_semantic(
                 rel_path, files_a[rel_path], files_b[rel_path],
                 layer, source_a, source_b, config,
             ))
 
-    # Run LLM merges in parallel
+    # Run merge tasks in parallel (LLM calls are async)
     if tasks:
         merge_results = await asyncio.gather(*tasks)
         for r in merge_results:
