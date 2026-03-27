@@ -149,12 +149,12 @@ SoulPort/                         # (原 BeiMingKungFu/)
 - [ ] SoulArena PNG 导出 - og:image 社交分享基础设施
 - [ ] 灵魂碑片 (Soul Shards) - 按层选择性导出/分享
 
-### v0.5 - 云同步（单用户）
-- [ ] `soulport push` — 上传 .bm 到 soul.polly.wang/api/push（固定 API Key 认证）
-- [ ] `soulport pull` — 从 soul.polly.wang/api/pull/latest 下载最新灵魂包
-- [ ] 服务端：SoulArena FastAPI 加 push/pull 端点，同机直通 /data/soulport/
-- [ ] 客户端：~/.soulport/config.json 存 endpoint + API key
-- [ ] 保留最近 10 个快照，自动清理
+### v0.5 ✅ 云同步 (2026-03-27)
+- [x] `soulport push` — 上传 .bm 到 soul.polly.wang/api/push（API Key 认证）
+- [x] `soulport pull` — 从 soul.polly.wang/api/pull/{agent_name} 下载最新灵魂包
+- [x] 服务端：SoulArena FastAPI 3 端点（push/pull/list），同机直通 /data/soulport/
+- [x] 保留最近 5 个快照，自动清理
+- [x] Azure VM 部署 + 端到端验证 (push 88.6KB → pull 88.6KB，hash 一致)
 
 ### v0.6 - 智能合并（护城河 + 专利核心）
 - [ ] LLM-assisted merge - 合并 MEMORY.md 时调 LLM 做语义去重 + 时间线整理
