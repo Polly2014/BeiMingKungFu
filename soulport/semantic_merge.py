@@ -225,8 +225,8 @@ async def merge_file_semantic(
                 # < 5 lines changed — not worth LLM, keep B
                 merged_sections.append(sb)
                 merge_notes.append(f"tiny→B: {title}")
-            elif diff_class == "medium":
-                # Layer 4: LLM with unified diff (small prompt)
+            else:  # "medium" or "large" — Layer 4: LLM semantic merge
+                label = "diff" if diff_class == "medium" else "full"
                 prompt = DIFF_MERGE_PROMPT.format(
                     filename=rel_path, section_title=title,
                     unified_diff=diff_text, text_b=sb,
@@ -235,21 +235,7 @@ async def merge_file_semantic(
                     merged_text = await _call_llm(prompt, config)
                     merged_sections.append(merged_text)
                     llm_used = True
-                    merge_notes.append(f"LLM(diff): {title}")
-                except Exception as e:
-                    merged_sections.append(sb)
-                    merge_notes.append(f"fail→B: {title}")
-            else:  # "large" — > 50% different
-                # Layer 4: LLM with both full sections
-                prompt = DIFF_MERGE_PROMPT.format(
-                    filename=rel_path, section_title=title,
-                    unified_diff=diff_text, text_b=sb,
-                )
-                try:
-                    merged_text = await _call_llm(prompt, config)
-                    merged_sections.append(merged_text)
-                    llm_used = True
-                    merge_notes.append(f"LLM(full): {title}")
+                    merge_notes.append(f"LLM({label}): {title}")
                 except Exception as e:
                     merged_sections.append(sb)
                     merge_notes.append(f"fail→B: {title}")
