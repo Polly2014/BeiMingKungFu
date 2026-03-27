@@ -149,15 +149,22 @@ SoulPort/                         # (原 BeiMingKungFu/)
 - [ ] SoulArena PNG 导出 - og:image 社交分享基础设施
 - [ ] 灵魂碑片 (Soul Shards) - 按层选择性导出/分享
 
-### v0.5 - 云传输
-- [ ] `soulport push` / `soulport pull` — Azure VM 自建，复用 SoulArena FastAPI (soul.polly.wang/api/push + /api/pull)
-- [ ] SoulArena 同机直通：push → /data/soulport/{agent_id}/ → SoulArena 直接读取，零网络跳
-- [ ] 认证：API Key header（每个 agent 一个 token）
-- [ ] 存储 backend 抽象层（LocalStorage），以后可换 R2
+### v0.5 - 云同步（单用户）
+- [ ] `soulport push` — 上传 .bm 到 soul.polly.wang/api/push（固定 API Key 认证）
+- [ ] `soulport pull` — 从 soul.polly.wang/api/pull/latest 下载最新灵魂包
+- [ ] 服务端：SoulArena FastAPI 加 push/pull 端点，同机直通 /data/soulport/
+- [ ] 客户端：~/.soulport/config.json 存 endpoint + API key
+- [ ] 保留最近 10 个快照，自动清理
 
 ### v0.6 - 智能合并（护城河 + 专利核心）
 - [ ] LLM-assisted merge - 合并 MEMORY.md 时调 LLM 做语义去重 + 时间线整理
 - [ ] Identity fusion - 两个 SOUL.md 合并时 LLM 辅助生成融合人格
+
+### v0.7 - 多用户云传输
+- [ ] 命名空间 + token 生成（`soulport push --name xiaolongxia`）
+- [ ] 公私分级（`--public` 自动进竞技场排行榜）
+- [ ] 存储配额（免费用户限快照数）
+- [ ] 存储 backend 抽象层（LocalStorage → R2）
 
 ### v1.0 - 跨框架
 - [ ] Claude Desktop adapter (P0, 用户量最大)
