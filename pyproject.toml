@@ -27,6 +27,7 @@ dependencies = [
 
 [project.optional-dependencies]
 mcp = ["fastmcp>=2.0"]
+cloud = ["httpx>=0.27"]
 
 [project.scripts]
 soulport = "soulport.cli:main"

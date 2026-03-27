@@ -617,6 +617,103 @@ def _print_manifest(manifest: Manifest, title: str = "Soul Package"):
     console.print(f"[dim]Total: {total_files} files, {_format_bytes(total_bytes)}[/]")
 
 
+# ─── Cloud Transfer ────────────────────────────────────────────────
+
+CLOUD_URL_DEFAULT = "https://soul.polly.wang"
+
+
+@main.command()
+@click.argument("bm_file", type=click.Path(exists=True))
+@click.option("--server", default=CLOUD_URL_DEFAULT, help="Cloud server URL")
+@click.option("--api-key", envvar="SOULPORT_CLOUD_KEY", default=None, help="API key (or set SOULPORT_CLOUD_KEY)")
+def push(bm_file, server, api_key):
+    """☁️ Push a .bm package to cloud storage.
+
+    Example: soulport push ./xiaolongxia-2026-03-27.bm
+    """
+    console.print(BANNER)
+
+    if not api_key:
+        console.print("[bold red]❌ API key required. Set SOULPORT_CLOUD_KEY or use --api-key[/]")
+        sys.exit(1)
+
+    bm_path = Path(bm_file)
+    console.print(f"[bold cyan]☁️ Pushing {bm_path.name} to {server}...[/]")
+
+    import httpx
+    try:
+        with open(bm_path, "rb") as f:
+            resp = httpx.post(
+                f"{server}/api/push",
+                headers={"x-api-key": api_key},
+                files={"file": (bm_path.name, f, "application/octet-stream")},
+                timeout=60.0,
+            )
+
+        if resp.status_code == 200:
+            data = resp.json()
+            console.print(f"[bold green]✅ {data.get('message', 'Pushed successfully')}[/]")
+            console.print(f"  Agent: {data.get('agent_name', '?')}")
+            console.print(f"  Size: {_format_bytes(data.get('size', 0))}")
+            console.print(f"  Hash: [dim]{data.get('content_hash', '?')}[/]")
+        else:
+            err = resp.json().get("error", resp.text) if resp.headers.get("content-type", "").startswith("application/json") else resp.text
+            console.print(f"[bold red]❌ Push failed ({resp.status_code}): {err}[/]")
+            sys.exit(1)
+    except httpx.ConnectError:
+        console.print(f"[bold red]❌ Cannot connect to {server}[/]")
+        sys.exit(1)
+    except (httpx.ReadTimeout, httpx.WriteTimeout):
+        console.print(f"[bold red]❌ Connection timed out[/]")
+        sys.exit(1)
+
+
+@main.command()
+@click.argument("agent_name")
+@click.option("--output", "-o", type=click.Path(), default=None, help="Output file path")
+@click.option("--version", "-v", default="latest", help="Snapshot version (default: latest)")
+@click.option("--server", default=CLOUD_URL_DEFAULT, help="Cloud server URL")
+@click.option("--api-key", envvar="SOULPORT_CLOUD_KEY", default=None, help="API key (or set SOULPORT_CLOUD_KEY)")
+def pull(agent_name, output, version, server, api_key):
+    """☁️ Pull a .bm package from cloud storage.
+
+    Example: soulport pull xiaolongxia
+    """
+    console.print(BANNER)
+
+    if not api_key:
+        console.print("[bold red]❌ API key required. Set SOULPORT_CLOUD_KEY or use --api-key[/]")
+        sys.exit(1)
+
+    console.print(f"[bold cyan]☁️ Pulling {agent_name} ({version}) from {server}...[/]")
+
+    import httpx
+    try:
+        resp = httpx.get(
+            f"{server}/api/pull/{agent_name}",
+            headers={"x-api-key": api_key},
+            params={"version": version},
+            timeout=60.0,
+        )
+
+        if resp.status_code == 200:
+            out_path = Path(output) if output else Path(f"{agent_name}-{version}.bm")
+            out_path.write_bytes(resp.content)
+            console.print(f"[bold green]✅ Soul pulled: {out_path}[/]")
+            console.print(f"  Size: {_format_bytes(len(resp.content))}")
+            console.print(f"\n[dim]Absorb with: soulport absorb {out_path}[/]")
+        else:
+            err = resp.json().get("error", resp.text) if resp.headers.get("content-type", "").startswith("application/json") else resp.text
+            console.print(f"[bold red]❌ Pull failed ({resp.status_code}): {err}[/]")
+            sys.exit(1)
+    except httpx.ConnectError:
+        console.print(f"[bold red]❌ Cannot connect to {server}[/]")
+        sys.exit(1)
+    except (httpx.ReadTimeout, httpx.WriteTimeout):
+        console.print(f"[bold red]❌ Connection timed out[/]")
+        sys.exit(1)
+
+
 STATUS_ICONS = {"ok": "[green]✅[/]", "warn": "[yellow]⚠️[/]", "missing": "[red]❌[/]"}
 
 
