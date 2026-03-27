@@ -370,9 +370,24 @@ def merge_souls_semantic(
         files_b = all_files[i]
         source_b = manifests[i].source_host or packages[i].name
 
-        report = asyncio.run(semantic_merge_packages(
+        # Run async merge — handle both sync CLI and async MCP contexts
+        coro = semantic_merge_packages(
             files_a, files_b, layer_map, source_a, source_b,
-        ))
+        )
+        try:
+            asyncio.get_running_loop()
+            # Already in async context (MCP server) — use nest_asyncio or thread
+            import threading
+            result_holder = [None]
+            def _run():
+                result_holder[0] = asyncio.run(coro)
+            t = threading.Thread(target=_run)
+            t.start()
+            t.join(timeout=300)
+            report = result_holder[0]
+        except RuntimeError:
+            # No running loop (CLI) — safe to asyncio.run()
+            report = asyncio.run(coro)
 
         # Build merged file dict for next iteration
         merged_files: dict[str, bytes] = {}

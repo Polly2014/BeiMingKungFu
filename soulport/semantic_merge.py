@@ -40,7 +40,7 @@ async def _call_llm(prompt: str, config: LLMConfig) -> str:
                 "model": config.model,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 8192,
-                "temperature": 0.3,  # low temperature for deterministic merging
+                "temperature": 0.3,  # low temp for deterministic, reproducible merging
             },
         )
         resp.raise_for_status()
@@ -151,18 +151,13 @@ async def merge_file_semantic(
             content=content_a,
         )
 
-    # Skills → keep longer version (assumed more evolved)
+    # Skills → keep version B (assumed newer in merge order, not by length)
+    # Future: compare manifest exported_at timestamps for more accurate selection
     if layer == "skills":
-        if len(content_b) >= len(content_a):
-            return MergeResult(
-                rel_path=rel_path, strategy="keep_newer", layer=layer,
-                content=content_b, merge_note="Kept version B (longer/newer)",
-            )
-        else:
-            return MergeResult(
-                rel_path=rel_path, strategy="keep_newer", layer=layer,
-                content=content_a, merge_note="Kept version A (longer)",
-            )
+        return MergeResult(
+            rel_path=rel_path, strategy="keep_newer", layer=layer,
+            content=content_b, merge_note="Kept version B (second package, assumed newer)",
+        )
 
     # Try to decode as text for LLM merge
     try:
@@ -194,7 +189,8 @@ async def merge_file_semantic(
             logger.warning(f"LLM merge failed for {rel_path}: {e}")
             return MergeResult(
                 rel_path=rel_path, strategy="llm_failed", layer=layer,
-                content=content_b, merge_note=f"LLM failed: {e}, kept version B",
+                content=content_b,
+                merge_note=f"> \u26a0\ufe0f LLM fusion failed: {e}. Kept version B.",
             )
 
     # Memory + Config: section-level diff, only send changed sections to LLM
