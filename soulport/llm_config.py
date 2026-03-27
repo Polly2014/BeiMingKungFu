@@ -27,7 +27,7 @@ CONFIG_DIR = Path.home() / ".soulport"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 DEFAULT_API_BASE = "https://api.polly.wang/v1"
-DEFAULT_MODEL = "claude-opus-4-20250514"
+DEFAULT_MODEL = "claude-opus-4.6"
 
 
 @dataclass

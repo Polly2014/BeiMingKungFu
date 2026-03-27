@@ -32,14 +32,14 @@ async def _call_llm(prompt: str, config: LLMConfig) -> str:
     """Call LLM via OpenAI-compatible API."""
     import httpx
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=180.0) as client:
         resp = await client.post(
             f"{config.api_base}/chat/completions",
             headers={"Authorization": f"Bearer {config.api_key}"},
             json={
                 "model": config.model,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 4000,
+                "max_tokens": 8192,
                 "temperature": 0.3,  # low temperature for deterministic merging
             },
         )
@@ -74,29 +74,25 @@ class SemanticMergeReport:
         return counts
 
 
-MEMORY_MERGE_PROMPT = """You are merging two versions of an AI agent's memory file: "{filename}"
+SECTION_MERGE_PROMPT = """Two versions of a markdown section have diverged.
+File: "{filename}", Section: "{section_title}"
 
-These two versions diverged because the same agent was used on different machines.
-Your job is to produce a single, unified version.
-
-=== VERSION A (source: {source_a}) ===
+=== VERSION A ===
 {text_a}
 
-=== VERSION B (source: {source_b}) ===
+=== VERSION B ===
 {text_b}
 
-Rules:
-1. If both describe the same event, keep the MORE DETAILED version
-2. Deduplicate semantically equivalent entries (not just exact text match)
-3. Maintain chronological order (earliest first)
-4. Preserve unique details that only appear in one version
-5. Keep the original markdown structure and formatting
-6. Do NOT add any commentary or explanation — output ONLY the merged content
+Merge rules:
+1. Deduplicate semantically equivalent content
+2. Keep the more detailed/recent version when both describe the same thing
+3. Preserve unique details from both
+4. Maintain the original markdown format
+5. Output ONLY the merged section content (no extra commentary)
 
-At the very end, add a single HTML comment with your merge decisions:
-<!-- merge note: [brief description of what was deduplicated/reordered/kept] -->
+At the very end, add: <!-- merge: [brief description of decisions] -->
 
-Output the merged file:"""
+Output:"""
 
 IDENTITY_MERGE_PROMPT = """Two versions of the same AI agent's personality file have diverged: "{filename}"
 
@@ -179,48 +175,103 @@ async def merge_file_semantic(
             content=content_b, merge_note="Binary file, kept version B",
         )
 
-    # Choose prompt based on layer
-    if layer in ("memory",):
-        prompt = MEMORY_MERGE_PROMPT
-    elif layer in ("identity",):
-        prompt = IDENTITY_MERGE_PROMPT
-    else:  # config, system, unknown
-        prompt = CONFIG_MERGE_PROMPT
+    # Identity files: small enough for whole-file LLM merge
+    if layer in ("identity",):
+        prompt = IDENTITY_MERGE_PROMPT.format(
+            filename=rel_path, text_a=text_a, text_b=text_b,
+            source_a=source_a, source_b=source_b,
+        )
+        try:
+            merged = await _call_llm(prompt, config)
+            merge_note = ""
+            if "<!-- merge" in merged:
+                merge_note = merged[merged.index("<!-- merge"):].strip()
+            return MergeResult(
+                rel_path=rel_path, strategy="llm_merge", layer=layer,
+                content=merged.encode("utf-8"), merge_note=merge_note,
+            )
+        except Exception as e:
+            logger.warning(f"LLM merge failed for {rel_path}: {e}")
+            return MergeResult(
+                rel_path=rel_path, strategy="llm_failed", layer=layer,
+                content=content_b, merge_note=f"LLM failed: {e}, kept version B",
+            )
 
-    prompt = prompt.format(
-        filename=rel_path,
-        text_a=text_a[:8000],  # truncate to avoid token limits
-        text_b=text_b[:8000],
-        source_a=source_a,
-        source_b=source_b,
+    # Memory + Config: section-level diff, only send changed sections to LLM
+    sections_a = _split_sections(text_a)
+    sections_b = _split_sections(text_b)
+
+    all_titles = list(dict.fromkeys(list(sections_a.keys()) + list(sections_b.keys())))
+    merged_sections = []
+    llm_used = False
+    merge_notes = []
+
+    for title in all_titles:
+        sa = sections_a.get(title, "")
+        sb = sections_b.get(title, "")
+
+        if sa == sb:
+            merged_sections.append(sb if sb else sa)
+        elif not sa:
+            merged_sections.append(sb)
+            merge_notes.append(f"+B: {title}")
+        elif not sb:
+            merged_sections.append(sa)
+            merge_notes.append(f"+A: {title}")
+        else:
+            # Both have this section but different — send to LLM
+            prompt = SECTION_MERGE_PROMPT.format(
+                filename=rel_path, section_title=title,
+                text_a=sa, text_b=sb,
+            )
+            try:
+                merged_text = await _call_llm(prompt, config)
+                merged_sections.append(merged_text)
+                llm_used = True
+                merge_notes.append(f"LLM: {title}")
+            except Exception as e:
+                # Fallback: keep version B for this section
+                merged_sections.append(sb)
+                merge_notes.append(f"fail({title}): {e}")
+
+    final_text = "\n\n".join(merged_sections)
+    note = "; ".join(merge_notes) if merge_notes else "all sections identical"
+
+    return MergeResult(
+        rel_path=rel_path,
+        strategy="llm_merge" if llm_used else "section_diff",
+        layer=layer,
+        content=final_text.encode("utf-8"),
+        merge_note=f"<!-- merge note: {note} -->",
     )
 
-    try:
-        merged_text = await _call_llm(prompt, config)
-        # Extract merge note
-        merge_note = ""
-        if "<!-- merge note:" in merged_text:
-            note_start = merged_text.index("<!-- merge note:")
-            merge_note = merged_text[note_start:].strip()
 
-        return MergeResult(
-            rel_path=rel_path, strategy="llm_merge", layer=layer,
-            content=merged_text.encode("utf-8"),
-            merge_note=merge_note,
-        )
-    except Exception as e:
-        logger.warning(f"LLM merge failed for {rel_path}: {e}. Falling back to keep-both.")
-        # Fallback: concatenate with separator
-        fallback = (
-            f"<!-- MERGE CONFLICT: LLM failed ({e}). Both versions kept. -->\n\n"
-            f"<!-- === VERSION A === -->\n{text_a}\n\n"
-            f"<!-- === VERSION B === -->\n{text_b}\n"
-        ).encode("utf-8")
-        return MergeResult(
-            rel_path=rel_path, strategy="llm_failed", layer=layer,
-            content=fallback,
-            merge_note=f"LLM failed: {e}",
-        )
+def _split_sections(text: str) -> dict[str, str]:
+    """Split markdown text into sections by heading (## or #).
+    
+    Returns {heading_line: full_section_text} preserving order.
+    Content before the first heading goes under key "__preamble__".
+    """
+    import re
+    sections: dict[str, str] = {}
+    current_key = "__preamble__"
+    current_lines: list[str] = []
+
+    for line in text.splitlines(keepends=True):
+        if re.match(r'^#{1,3}\s', line):
+            # Save previous section
+            if current_lines:
+                sections[current_key] = "".join(current_lines)
+            current_key = line.strip()
+            current_lines = [line]
+        else:
+            current_lines.append(line)
+
+    # Save last section
+    if current_lines:
+        sections[current_key] = "".join(current_lines)
+
+    return sections
 
 
 async def semantic_merge_packages(
