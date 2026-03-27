@@ -332,6 +332,102 @@ def merge_souls(
             shutil.rmtree(merged_workspace, ignore_errors=True)
 
 
+def merge_souls_semantic(
+    packages: list[Path],
+    output: Optional[Path] = None,
+    dry_run: bool = False,
+) -> tuple[Optional[Path], "SemanticMergeReport"]:
+    """
+    Merge .bm packages using LLM-assisted semantic merge.
+    
+    Returns (output_path, report). If dry_run, output_path is None.
+    """
+    import asyncio
+    from .semantic_merge import SemanticMergeReport, semantic_merge_packages
+
+    if len(packages) < 2:
+        raise ValueError("Need at least 2 packages to merge")
+
+    if output is None:
+        output = Path(f"merged-semantic-{datetime.now().strftime('%Y-%m-%d')}.bm")
+
+    # Read manifests and extract files
+    manifests = [_read_manifest(p) for p in packages]
+    all_files = [_extract_workspace_files(p) for p in packages]
+
+    # Build layer map from all manifests
+    layer_map: dict[str, str] = {}
+    for m in manifests:
+        for layer in m.layers:
+            for f in layer.files:
+                layer_map[f] = layer.name
+
+    # Start with first pair, then fold in additional packages
+    files_a = all_files[0]
+    source_a = manifests[0].source_host or packages[0].name
+
+    for i in range(1, len(packages)):
+        files_b = all_files[i]
+        source_b = manifests[i].source_host or packages[i].name
+
+        report = asyncio.run(semantic_merge_packages(
+            files_a, files_b, layer_map, source_a, source_b,
+        ))
+
+        # Build merged file dict for next iteration
+        merged_files: dict[str, bytes] = {}
+        for r in report.results:
+            merged_files[r.rel_path] = r.content
+
+        files_a = merged_files
+        source_a = f"merged({source_a}, {source_b})"
+
+    if dry_run:
+        return None, report
+
+    # Write merged .bm package
+    merged_workspace = Path(tempfile.mkdtemp(prefix="soulport-semantic-"))
+    try:
+        for rel_path, content in merged_files.items():
+            dest = merged_workspace / rel_path
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(content)
+
+        # Re-scan for layer info
+        from .scanner import scan_workspace
+        merged_layers = scan_workspace(merged_workspace)
+
+        primary = manifests[0]
+        merged_manifest = Manifest(
+            soulport_version=__version__,
+            agent_name=primary.agent_name,
+            source_host=source_a,
+            source_framework=primary.source_framework,
+            source_workspace="<semantic-merge>",
+            exported_at=datetime.now(timezone.utc).isoformat(),
+            layers=merged_layers,
+            merge_parents=[m.content_hash for m in manifests],
+            merge_strategy="semantic",
+        )
+
+        with tarfile.open(output, "w:gz") as tar:
+            manifest_bytes = merged_manifest.to_json().encode("utf-8")
+            info = tarfile.TarInfo(name="manifest.json")
+            info.size = len(manifest_bytes)
+            tar.addfile(info, BytesIO(manifest_bytes))
+
+            for layer in merged_layers:
+                for rel_path in layer.files:
+                    full_path = merged_workspace / rel_path
+                    if full_path.exists():
+                        tar.add(full_path, arcname=f"workspace/{rel_path}")
+
+        return output, report
+
+    finally:
+        shutil.rmtree(merged_workspace, ignore_errors=True)
+
+
 # ── Internal helpers ───────────────────────────────────────────────
 
 def _read_manifest(package_path: Path) -> Manifest:

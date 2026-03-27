@@ -43,6 +43,8 @@ class Manifest:
     redacted_fields: list[str] = field(default_factory=list)  # what was sanitized
     content_hash: str = ""                   # SHA256 of all content
     parent_hash: str = ""                    # content_hash of previous export (Soul Lineage)
+    merge_parents: list[str] = field(default_factory=list)  # DAG: content_hashes of merge sources
+    merge_strategy: str = ""                 # "file" or "semantic"
     encrypted: bool = False
     
     def to_dict(self) -> dict:
@@ -67,6 +69,8 @@ class Manifest:
             "redacted_fields": self.redacted_fields,
             "content_hash": self.content_hash,
             "parent_hash": self.parent_hash,
+            "merge_parents": self.merge_parents,
+            "merge_strategy": self.merge_strategy,
             "encrypted": self.encrypted,
         }
     
@@ -90,5 +94,7 @@ class Manifest:
             redacted_fields=data.get("redacted_fields", []),
             content_hash=data.get("content_hash", ""),
             parent_hash=data.get("parent_hash", ""),
+            merge_parents=data.get("merge_parents", []),
+            merge_strategy=data.get("merge_strategy", ""),
             encrypted=data.get("encrypted", False),
         )

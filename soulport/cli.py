@@ -194,8 +194,15 @@ def inspect(package):
 @click.argument("packages", nargs=-1, required=True, type=click.Path(exists=True))
 @click.option("--output", "-o", type=click.Path(), default=None,
               help="Output merged .bm file")
-def merge(packages, output):
-    """🔄 Merge multiple soul packages into one."""
+@click.option("--semantic", is_flag=True, default=False,
+              help="Use LLM-assisted semantic merge (requires API key)")
+@click.option("--dry-run", is_flag=True, default=False,
+              help="Preview merge strategy without writing")
+def merge(packages, output, semantic, dry_run):
+    """🔄 Merge multiple soul packages into one.
+
+    Use --semantic for LLM-assisted cognitive-level merging.
+    """
     console.print(BANNER)
     
     if len(packages) < 2:
@@ -204,23 +211,76 @@ def merge(packages, output):
     
     pkg_paths = [Path(p) for p in packages]
     out = Path(output) if output else None
-    
+
+    # Show what we're merging
+    console.print("[bold]Merging souls:[/]")
+    for p in pkg_paths:
+        m = inspect_soul(p)
+        console.print(f"  • {p.name} — {m.agent_name} from {m.source_host}")
+
+    if semantic:
+        _merge_semantic(pkg_paths, out, dry_run)
+    else:
+        _merge_file_level(pkg_paths, out)
+
+
+def _merge_file_level(pkg_paths, out):
+    """File-level merge (existing behavior)."""
     try:
-        # Show what we're merging
-        console.print("[bold]Merging souls:[/]")
-        for p in pkg_paths:
-            m = inspect_soul(p)
-            console.print(f"  • {p.name} — {m.agent_name} from {m.source_host}")
-        
-        with console.status("[bold cyan]Merging souls..."):
+        with console.status("[bold cyan]Merging souls (file-level)..."):
             result = merge_souls(packages=pkg_paths, output=out)
-        
         manifest = inspect_soul(result)
         _print_manifest(manifest, title="Merged Soul")
-        
         file_size = result.stat().st_size
         console.print(f"\n[bold green]✅ Merged soul saved to:[/] {result} ({_format_bytes(file_size)})\n")
-        
+    except (FileNotFoundError, ValueError) as e:
+        console.print(f"[bold red]❌ {e}[/]")
+        sys.exit(1)
+
+
+def _merge_semantic(pkg_paths, out, dry_run):
+    """LLM-assisted semantic merge."""
+    from .core import merge_souls_semantic
+    from .llm_config import ensure_llm_configured
+
+    err = ensure_llm_configured()
+    if err:
+        console.print(f"[bold red]❌ {err}[/]")
+        sys.exit(1)
+
+    try:
+        console.print(f"\n[bold cyan]🧠 Semantic merge (LLM-assisted)...[/]")
+        result_path, report = merge_souls_semantic(
+            packages=pkg_paths, output=out, dry_run=dry_run,
+        )
+
+        # Print merge report
+        summary = report.summary
+        console.print(f"\n[bold]📊 Merge Report[/]")
+        console.print(f"  LLM calls: {report.llm_calls} (failures: {report.llm_failures})")
+        for strategy, count in sorted(summary.items()):
+            icon = {
+                "identical": "[dim]=[/]", "keep_a": "[green]+A[/]",
+                "keep_b": "[green]+B[/]", "keep_newer": "[yellow]→new[/]",
+                "llm_merge": "[bold cyan]🧠LLM[/]", "llm_failed": "[red]⚠️fail[/]",
+            }.get(strategy, strategy)
+            console.print(f"  {icon} {strategy}: {count}")
+
+        # Show merge notes from LLM
+        for r in report.results:
+            if r.merge_note:
+                console.print(f"\n  [dim]{r.rel_path}:[/]")
+                console.print(f"    [dim]{r.merge_note}[/]")
+
+        if dry_run:
+            console.print(f"\n[bold yellow]🔍 Dry run — no file written.[/]")
+            console.print(f"[dim]Remove --dry-run to create the merged .bm package.[/]\n")
+        else:
+            manifest = inspect_soul(result_path)
+            _print_manifest(manifest, title="Semantically Merged Soul")
+            file_size = result_path.stat().st_size
+            console.print(f"\n[bold green]✅ Merged soul saved to:[/] {result_path} ({_format_bytes(file_size)})\n")
+
     except (FileNotFoundError, ValueError) as e:
         console.print(f"[bold red]❌ {e}[/]")
         sys.exit(1)
