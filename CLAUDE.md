@@ -56,6 +56,16 @@ SoulPort/                         # (原 BeiMingKungFu/)
 - merge 使用 `extractall(filter='data')` 防 tarfile 路径穿越
 - absorb 前可 inspect 预览，确认后才生效
 - export 完成后显示被脱敏的字段列表
+- cloud push/pull 端点：`safe_name` regex 去 `.` + `resolve().is_relative_to()` 双重防护
+
+### ⚠️ 已知限制：脱敏字段不可逆
+
+export 时 API keys/tokens 被替换为 `__SOULPORT_REDACTED__`，**absorb 后这些字段不会自动恢复**。
+这是 by design——灵魂迁移迁的是"你是谁"，不是"你的钥匙"。新机器上应该用新的 key。
+
+**影响范围**：仅 System 层（`openclaw.json` 等配置文件中的 secrets），Memory/Identity/Config/Skills 四层完整恢复。
+
+**TODO**：absorb 后检测 REDACTED 字段，给出明确提示（哪些字段需要手动配置）。
 
 ## 支持的 Agent 框架
 
@@ -146,7 +156,7 @@ SoulPort/                         # (原 BeiMingKungFu/)
 ### v0.4 ✅ MCP + 社交 (2026-03-27)
 - [x] SoulPort MCP Server - 6 tools (export/doctor/diff/changelog/status/snapshot), FastMCP, stdio+HTTP
 - [x] `soulport status` CLI - 健康分 + 快照概览
-- [ ] SoulArena PNG 导出 - og:image 社交分享基础设施
+- [x] SoulArena PNG 导出 - og:image 社交分享（cairosvg SVG→PNG, emoji stripped, Noto CJK 中文渲染）
 - [ ] 灵魂碑片 (Soul Shards) - 按层选择性导出/分享
 
 ### v0.5 ✅ 云同步 (2026-03-27)
