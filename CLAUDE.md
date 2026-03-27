@@ -150,8 +150,10 @@ SoulPort/                         # (原 BeiMingKungFu/)
 - [ ] 灵魂碑片 (Soul Shards) - 按层选择性导出/分享
 
 ### v0.5 - 云传输
-- [ ] `soulport push` / `soulport pull` — Cloudflare R2 中转（私有 bucket + agent hash 路径隔离）
-- [ ] 安全靠访问控制（R2 token + HTTPS + 脱敏兜底），不靠加密
+- [ ] `soulport push` / `soulport pull` — Azure VM 自建，复用 SoulArena FastAPI (soul.polly.wang/api/push + /api/pull)
+- [ ] SoulArena 同机直通：push → /data/soulport/{agent_id}/ → SoulArena 直接读取，零网络跳
+- [ ] 认证：API Key header（每个 agent 一个 token）
+- [ ] 存储 backend 抽象层（LocalStorage），以后可换 R2
 
 ### v0.6 - 智能合并（护城河 + 专利核心）
 - [ ] LLM-assisted merge - 合并 MEMORY.md 时调 LLM 做语义去重 + 时间线整理
