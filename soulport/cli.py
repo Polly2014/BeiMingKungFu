@@ -117,7 +117,9 @@ def export(workspace, output, name, include_projects, no_config):
               help="Preview what would be absorbed without writing")
 @click.option("--force", is_flag=True, default=False,
               help="Overwrite existing files without asking")
-def absorb(package, workspace, layers, dry_run, force):
+@click.option("--interactive", "-i", is_flag=True, default=False,
+              help="Interactively select layers to absorb")
+def absorb(package, workspace, layers, dry_run, force, interactive):
     """🌀 Absorb a soul package into your agent."""
     console.print(BANNER)
     
@@ -129,6 +131,13 @@ def absorb(package, workspace, layers, dry_run, force):
         # Preview first
         manifest = inspect_soul(pkg)
         _print_manifest(manifest, title="Soul to Absorb")
+        
+        # Interactive layer selection
+        if interactive and not layer_list:
+            layer_list = _interactive_layer_select(manifest)
+            if not layer_list:
+                console.print("[yellow]No layers selected. Cancelled.[/]")
+                return
         
         if not dry_run and not force:
             if not click.confirm("\n🌀 Proceed with absorption?"):
@@ -632,6 +641,31 @@ LAYER_EMOJIS = {
     "projects": "📁",
     "system": "🔧",
 }
+
+
+LAYER_ICONS = {
+    "identity": "👤", "memory": "🧠", "config": "⚙️",
+    "skills": "🛠️", "system": "🔧", "other": "📁",
+}
+
+
+def _interactive_layer_select(manifest: Manifest) -> list[str]:
+    """Show an interactive layer selection prompt using Rich + click."""
+    console.print("\n[bold]Select layers to absorb:[/]\n")
+    available = []
+    for layer in manifest.layers:
+        icon = LAYER_ICONS.get(layer.name, "📁")
+        size_kb = layer.total_bytes / 1024
+        available.append(layer.name)
+        console.print(f"  {icon} [bold]{layer.name}[/] — {layer.file_count} files ({size_kb:.1f} KB)")
+    console.print()
+
+    selected = []
+    for name in available:
+        icon = LAYER_ICONS.get(name, "📁")
+        if click.confirm(f"  {icon} Include [bold]{name}[/]?", default=True):
+            selected.append(name)
+    return selected
 
 
 def _print_manifest(manifest: Manifest, title: str = "Soul Package"):
