@@ -5,6 +5,7 @@ SoulPort scanner — discovers agent workspace files and categorizes them into l
 import os
 import json
 import re
+import fnmatch
 from pathlib import Path
 from typing import Optional
 
@@ -157,24 +158,42 @@ def scan_workspace(workspace_path: str | Path) -> list[ManifestLayer]:
 
 
 def _matches_pattern(filepath: str, pattern: str) -> bool:
-    """Simple glob-like matching."""
-    if "**" in pattern:
-        # e.g. "memory/**/*.md" → check prefix + suffix
-        prefix = pattern.split("**")[0].rstrip("/")
-        suffix = pattern.split("**")[-1].lstrip("/")
-        if not filepath.startswith(prefix):
-            return False
-        if suffix and "*" in suffix:
-            ext = suffix.replace("*", "")
-            return filepath.endswith(ext) or not ext
-        return True
-    elif "*" in pattern:
-        # e.g. "skills/*/SKILL.md"
-        regex = pattern.replace("*", "[^/]+")
-        return bool(re.match(f"^{regex}$", filepath))
-    else:
-        # Exact match
-        return filepath == pattern
+    """Glob-like matching with proper ** support.
+
+    ** matches any number of path segments (including zero).
+    * matches any characters except /.
+    """
+    # Convert glob pattern to regex
+    i, n = 0, len(pattern)
+    regex = ""
+    while i < n:
+        c = pattern[i]
+        if c == "*":
+            if i + 1 < n and pattern[i + 1] == "*":
+                # ** — match anything (including /)
+                if i + 2 < n and pattern[i + 2] == "/":
+                    # **/ — match any prefix including empty
+                    regex += "(?:.+/)?"
+                    i += 3
+                elif i > 0 and pattern[i - 1] == "/":
+                    # /** at end — strip the already-added '/' and match suffix
+                    regex = regex.rstrip("/")
+                    regex += "(?:/.+)?"
+                    i += 2
+                else:
+                    regex += ".*"
+                    i += 2
+            else:
+                # * — match non-slash chars
+                regex += "[^/]*"
+                i += 1
+        elif c in r"\.+^${}()|[]":
+            regex += "\\" + c
+            i += 1
+        else:
+            regex += c
+            i += 1
+    return bool(re.match(f"^{regex}$", filepath))
 
 
 def find_openclaw_workspace() -> Optional[Path]:
