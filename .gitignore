@@ -9,3 +9,6 @@ build/
 .venv/
 .env
 docs/
+Patent/
+Paper/
+CLAUDE.md
