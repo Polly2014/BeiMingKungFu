@@ -258,7 +258,6 @@ def _split_sections(text: str) -> dict[str, str]:
     Returns {heading_line: full_section_text} preserving order.
     Content before the first heading goes under key "__preamble__".
     """
-    import re
     sections: dict[str, str] = {}
     current_key = "__preamble__"
     current_lines: list[str] = []

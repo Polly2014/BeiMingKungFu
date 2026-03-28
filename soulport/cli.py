@@ -640,12 +640,7 @@ LAYER_EMOJIS = {
     "skills": "🛠️",
     "projects": "📁",
     "system": "🔧",
-}
-
-
-LAYER_ICONS = {
-    "identity": "👤", "memory": "🧠", "config": "⚙️",
-    "skills": "🛠️", "system": "🔧", "other": "📁",
+    "other": "📁",
 }
 
 
@@ -654,7 +649,7 @@ def _interactive_layer_select(manifest: Manifest) -> list[str]:
     console.print("\n[bold]Select layers to absorb:[/]\n")
     available = []
     for layer in manifest.layers:
-        icon = LAYER_ICONS.get(layer.name, "📁")
+        icon = LAYER_EMOJIS.get(layer.name, "📁")
         size_kb = layer.total_bytes / 1024
         available.append(layer.name)
         console.print(f"  {icon} [bold]{layer.name}[/] — {layer.file_count} files ({size_kb:.1f} KB)")
@@ -662,8 +657,8 @@ def _interactive_layer_select(manifest: Manifest) -> list[str]:
 
     selected = []
     for name in available:
-        icon = LAYER_ICONS.get(name, "📁")
-        if click.confirm(f"  {icon} Include [bold]{name}[/]?", default=True):
+        icon = LAYER_EMOJIS.get(name, "📁")
+        if click.confirm(f"  {icon} Include {name}?", default=True):
             selected.append(name)
     return selected
 

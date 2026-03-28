@@ -5,7 +5,6 @@ SoulPort scanner — discovers agent workspace files and categorizes them into l
 import os
 import json
 import re
-import fnmatch
 from pathlib import Path
 from typing import Optional
 
@@ -187,7 +186,11 @@ def _matches_pattern(filepath: str, pattern: str) -> bool:
                 # * — match non-slash chars
                 regex += "[^/]*"
                 i += 1
-        elif c in r"\.+^${}()|[]":
+        elif c == "?":
+            # ? — match single non-slash char
+            regex += "[^/]"
+            i += 1
+        elif c in ".+^${}()|[]":
             regex += "\\" + c
             i += 1
         else:
