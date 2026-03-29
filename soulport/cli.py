@@ -16,8 +16,8 @@ from rich.tree import Tree
 from . import __version__
 from .core import (
     FileDiff, SoulDiff,
-    absorb_soul, changelog as core_changelog, diff_soul, export_soul,
-    inspect_soul, merge_souls,
+    absorb_soul, changelog as core_changelog, diff_packages, diff_soul,
+    export_soul, inspect_soul, merge_souls,
 )
 from .doctor import DoctorReport, check_soul_health
 from .manifest import Manifest
@@ -640,19 +640,28 @@ def rollback(hash_prefix, workspace, snapshot_dir, force, dry_run, no_backup):
 
 @main.command()
 @click.argument("package", type=click.Path(exists=True))
+@click.argument("target", type=click.Path(exists=True), required=False, default=None)
 @click.option("--workspace", "-w", type=click.Path(exists=True), default=None,
               help="Target workspace path (auto-detects OpenClaw)")
 @click.option("--full", is_flag=True, default=False,
               help="Show unified diff for modified files")
-def diff(package, workspace, full):
-    """🔍 Compare a .bm package against your current workspace."""
+def diff(package, target, workspace, full):
+    """🔍 Compare a .bm package against your workspace or another .bm.
+
+    One argument:  soulport diff agent.bm          → compare vs workspace
+    Two arguments: soulport diff old.bm new.bm     → compare two packages
+    """
     console.print(BANNER)
 
     pkg = Path(package)
-    ws = Path(workspace) if workspace else None
 
     try:
-        result = diff_soul(package_path=pkg, workspace=ws)
+        if target and Path(target).is_file():
+            # .bm vs .bm comparison
+            result = diff_packages(pkg, Path(target))
+        else:
+            ws = Path(workspace or target) if (workspace or target) else None
+            result = diff_soul(package_path=pkg, workspace=ws)
         _print_diff(result, show_full=full)
     except (FileNotFoundError, ValueError) as e:
         console.print(f"[bold red]❌ {e}[/]")

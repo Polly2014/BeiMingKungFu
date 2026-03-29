@@ -571,8 +571,6 @@ class SoulDiff:
 def diff_soul(
     package_path: Path,
     workspace: Optional[Path] = None,
-    # TODO v0.3: add `target: Optional[Path] = None` for .bm vs .bm comparison
-    #   (needed for changelog/lineage — compare two snapshots without a workspace)
 ) -> SoulDiff:
     """
     Compare a .bm package against the current workspace.

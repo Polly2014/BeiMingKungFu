@@ -19,6 +19,8 @@ pip install soulport
 ```bash
 # Core — transfer
 soulport export                     # Export soul → .bm file
+soulport export --layers skills     # Soul Shard: export only skills layer
+soulport export -l memory -l identity  # Soul Shard: multiple layers
 soulport absorb ./agent.bm         # Restore soul on a new machine
 soulport absorb ./agent.bm -i      # Interactive: select layers to absorb
 soulport merge a.bm b.bm -o out.bm # Merge multiple agent souls
@@ -29,6 +31,7 @@ soulport inspect ./agent.bm        # Preview package contents
 # Diagnose
 soulport doctor                     # Five-layer health check + score
 soulport diff ./agent.bm           # Compare .bm vs current workspace
+soulport diff a.bm b.bm            # Compare two .bm packages
 soulport status                     # Health score + snapshot overview
 
 # Version control
@@ -110,6 +113,7 @@ Add to your OpenClaw config (`openclaw.json`):
 
 - API keys/tokens **auto-redacted** on export (`__SOULPORT_REDACTED__`)
 - Redaction is **intentionally irreversible** — your soul travels, your keys stay
+- After absorb, CLI shows 🔑 **Action Required** panel listing redacted fields to configure
 - Path traversal protection on absorb (`resolve().relative_to()`)
 - Cloud endpoints: safe-name regex + `is_relative_to()` double guard
 - tarfile `filter='data'` on merge/extract
@@ -123,7 +127,7 @@ Add to your OpenClaw config (`openclaw.json`):
 - `manifest.json` — metadata, version, content hash, parent hash
 - `workspace/` — agent workspace files
 - `config/` — sanitized system configuration
-
+See [FORMAT.md](FORMAT.md) for the full format specification.
 > **Why `.bm`?** Named after 北冥 (BěiMíng) — the mythical Northern Sea from Zhuangzi's *"Wandering Beyond"*, where a fish transforms into a bird. A soul's form is free.
 
 ## Supported Frameworks
