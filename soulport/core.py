@@ -33,9 +33,14 @@ def export_soul(
     include_config: bool = True,
     include_projects: bool = False,
     name_override: Optional[str] = None,
+    selected_layers: Optional[list[str]] = None,
 ) -> Path:
     """
     Export an agent's soul to a .bm package.
+    
+    Args:
+        selected_layers: If provided, only export these layers (e.g. ["skills", "memory"]).
+                         When set, include_projects is ignored.
     
     Returns the path to the created .bm file.
     """
@@ -56,8 +61,10 @@ def export_soul(
     # Scan workspace into layers
     layers = scan_workspace(workspace)
     
-    # Filter out projects layer if not requested
-    if not include_projects:
+    # Filter layers
+    if selected_layers:
+        layers = [l for l in layers if l.name in selected_layers]
+    elif not include_projects:
         layers = [l for l in layers if l.name != "projects"]
     
     # Build manifest
@@ -69,6 +76,7 @@ def export_soul(
         source_workspace=str(workspace),
         exported_at=datetime.now(timezone.utc).isoformat(),
         layers=layers,
+        selected_layers=selected_layers or [],
     )
     
     # Generate output filename
@@ -92,8 +100,8 @@ def export_soul(
                 if full_path.exists():
                     tar.add(full_path, arcname=f"workspace/{rel_path}")
         
-        # Add sanitized system config
-        if include_config:
+        # Add sanitized system config (skip if layer selection excludes it)
+        if include_config and not selected_layers:
             config_path = find_openclaw_config()
             if config_path and config_path.exists():
                 raw = config_path.read_text(encoding="utf-8")
@@ -165,6 +173,8 @@ def absorb_soul(
         "files_written": 0,
         "files_skipped": 0,
         "conflicts": [],
+        "redacted_fields": list(manifest.redacted_fields),
+        "redacted_in_files": _scan_package_for_redacted(package_path),
     }
     
     if dry_run:
@@ -444,6 +454,31 @@ def merge_souls_semantic(
 
 
 # ── Internal helpers ───────────────────────────────────────────────
+
+def _scan_package_for_redacted(package_path: Path) -> list[str]:
+    """Scan all files inside a .bm package for __SOULPORT_REDACTED__ markers.
+    
+    Covers both workspace/ files (layers) and config/ files (system config
+    where API keys/tokens are most likely to be redacted).
+    """
+    redacted_in = []
+    with tarfile.open(package_path, "r:gz") as tar:
+        for member in tar.getmembers():
+            if not member.isfile() or member.size > 1_000_000:
+                continue
+            if member.name == "manifest.json":
+                continue
+            f = tar.extractfile(member)
+            if f is None:
+                continue
+            try:
+                content = f.read().decode("utf-8")
+                if "__SOULPORT_REDACTED__" in content:
+                    redacted_in.append(member.name)
+            except UnicodeDecodeError:
+                pass
+    return redacted_in
+
 
 def _read_manifest(package_path: Path) -> Manifest:
     """Extract and parse manifest.json from a .bm package."""

@@ -46,6 +46,7 @@ class Manifest:
     merge_parents: list[str] = field(default_factory=list)  # DAG: content_hashes of merge sources
     merge_strategy: str = ""                 # "file" or "semantic"
     encrypted: bool = False
+    selected_layers: list[str] = field(default_factory=list)  # non-empty = Soul Shard
     
     def to_dict(self) -> dict:
         return {
@@ -72,6 +73,7 @@ class Manifest:
             "merge_parents": self.merge_parents,
             "merge_strategy": self.merge_strategy,
             "encrypted": self.encrypted,
+            "selected_layers": self.selected_layers,
         }
     
     def to_json(self, indent: int = 2) -> str:
@@ -97,4 +99,5 @@ class Manifest:
             merge_parents=data.get("merge_parents", []),
             merge_strategy=data.get("merge_strategy", ""),
             encrypted=data.get("encrypted", False),
+            selected_layers=data.get("selected_layers", []),
         )

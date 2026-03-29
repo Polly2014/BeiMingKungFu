@@ -69,12 +69,20 @@ def main():
               help="Include project files (teams-bridge, etc.)")
 @click.option("--no-config", is_flag=True, default=False,
               help="Skip system config export")
-def export(workspace, output, name, include_projects, no_config):
-    """📤 Export your agent's soul to a .bm package."""
+@click.option("--layers", "-l", multiple=True,
+              help="Only export specific layers (identity, memory, config, skills). Repeatable.")
+def export(workspace, output, name, include_projects, no_config, layers):
+    """📤 Export your agent's soul to a .bm package.
+
+    Use --layers to create a Soul Shard (partial export):
+      soulport export --layers skills          # share just your skills
+      soulport export -l memory -l identity    # memory + identity only
+    """
     console.print(BANNER)
     
     ws = Path(workspace) if workspace else None
     out = Path(output) if output else None
+    layer_list = list(layers) if layers else None
     
     try:
         with console.status("[bold cyan]Scanning workspace..."):
@@ -84,11 +92,15 @@ def export(workspace, output, name, include_projects, no_config):
                 include_config=not no_config,
                 include_projects=include_projects,
                 name_override=name,
+                selected_layers=layer_list,
             )
         
         # Show what was exported
         manifest = inspect_soul(result)
-        _print_manifest(manifest, title="Exported Soul")
+        title = "Soul Shard" if layer_list else "Exported Soul"
+        if layer_list:
+            title += f" ({', '.join(layer_list)})"
+        _print_manifest(manifest, title=title)
         
         file_size = result.stat().st_size
         console.print(f"\n[bold green]✅ Soul exported to:[/] {result} ({_format_bytes(file_size)})")
@@ -168,6 +180,22 @@ def absorb(package, workspace, layers, dry_run, force, interactive):
         
         if summary.get("files_skipped"):
             console.print(f"  Files skipped: {summary['files_skipped']}")
+        
+        # Warn about redacted fields that need manual configuration
+        redacted_fields = summary.get("redacted_fields", [])
+        redacted_in_files = summary.get("redacted_in_files", [])
+        if redacted_fields or redacted_in_files:
+            console.print("\n[bold yellow]🔑 Action Required — Redacted Secrets[/]")
+            console.print("  [dim]These fields were sanitized during export and need manual configuration:[/]\n")
+            if redacted_fields:
+                for rf in redacted_fields:
+                    console.print(f"    [yellow]•[/] {rf}")
+            if redacted_in_files:
+                console.print("\n  [dim]Files containing __SOULPORT_REDACTED__ markers:[/]")
+                for rf in redacted_in_files:
+                    console.print(f"    [yellow]📄[/] {rf}")
+            console.print("\n  [dim italic]💡 Tip: These are API keys/tokens from the original machine.")
+            console.print("  Set up fresh credentials on this machine — souls migrate, keys don't.[/]")
         
         console.print()
         
