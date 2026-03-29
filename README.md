@@ -2,7 +2,7 @@
 
 > **`.bm` is the standard format for AI agent souls. The CLI is just the first consumer.**
 
-SoulPort defines a cross-framework standard for AI agent identities — memories, personality, skills, configuration. Export from one machine, absorb into another, watch for changes, rollback when needed.
+Export your agent's personality, memories, and skills into a single portable file. Move between machines, merge diverged copies, or evaluate on [SoulArena](https://soul.polly.wang).
 
 Migration is the first use case. Evaluation ([SoulArena](https://soul.polly.wang)), fusion, version control, and cross-framework interop are next.
 
@@ -37,7 +37,7 @@ soulport watch --once               # Single snapshot for cron/scripts
 soulport changelog                  # Show changes between snapshots
 soulport rollback <hash>            # Restore to a previous snapshot
 
-# Cloud sync
+# Cloud sync (auth via SOULPORT_CLOUD_KEY env var or --api-key)
 soulport push                       # Upload .bm to soul.polly.wang
 soulport pull <agent_name>          # Download latest soul from cloud
 ```
@@ -87,9 +87,21 @@ soulport merge home.bm office.bm --semantic --dry-run  # preview first
 SoulPort includes a [Model Context Protocol](https://modelcontextprotocol.io/) server, allowing AI agents to manage their own souls programmatically:
 
 ```bash
-pip install soulport[mcp]
+pip install 'soulport[mcp]'
 soulport mcp           # Start MCP server (stdio)
 soulport mcp --http    # Start MCP server (HTTP)
+```
+
+Add to your OpenClaw config (`openclaw.json`):
+```json
+{
+  "mcpServers": {
+    "soulport": {
+      "command": "soulport",
+      "args": ["mcp"]
+    }
+  }
+}
 ```
 
 6 tools: `soulport_export`, `soulport_doctor`, `soulport_diff`, `soulport_changelog`, `soulport_status`, `soulport_snapshot`. Read/create only — destructive ops require human confirmation.
@@ -117,7 +129,7 @@ soulport mcp --http    # Start MCP server (HTTP)
 ## Supported Frameworks
 
 - ✅ **OpenClaw** (first-class support)
-- 🔜 Claude Desktop, Cursor, Windsurf via adapters
+- 🔜 Cross-framework adapters (Claude Desktop, Cursor, etc.)
 
 ## Links
 
