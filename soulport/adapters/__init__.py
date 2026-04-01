@@ -127,4 +127,5 @@ def list_adapters() -> list[str]:
 # Order matters for detect_framework(): more specific adapters first.
 
 from . import claude_code  # noqa: E402, F401
+from . import copilot  # noqa: E402, F401
 from . import openclaw  # noqa: E402, F401

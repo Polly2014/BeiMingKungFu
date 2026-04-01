@@ -108,14 +108,15 @@ def export_soul(
         info.size = len(manifest_bytes)
         tar.addfile(info, BytesIO(manifest_bytes))
         
-        # Add workspace files
+        # Add workspace files (dereference symlinks to store actual content)
         for layer in layers:
             for rel_path in layer.files:
                 full_path = workspace / rel_path
                 if full_path.exists():
-                    tar.add(full_path, arcname=f"workspace/{rel_path}")
+                    real_path = full_path.resolve()
+                    tar.add(real_path, arcname=f"workspace/{rel_path}")
 
-        # Add extra export files (e.g. CLAUDE.md from project root)
+        # Add extra export files (e.g. CLAUDE.md from project root, Copilot memories)
         for src_path, archive_path in adapter.get_extra_export_files(project_dir):
             if src_path.exists():
                 tar.add(src_path, arcname=archive_path)
