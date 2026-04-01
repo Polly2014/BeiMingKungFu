@@ -57,11 +57,12 @@ def _find_workspace_storage(project_dir: Path) -> Optional[Path]:
             try:
                 data = json.loads(ws_json.read_text(encoding="utf-8"))
                 folder = data.get("folder", "")
-                # folder is a URI like file:///Users/polly/...
+                # folder is a URI like file:///Users/polly/... or file:///C:/...
                 if folder.startswith("file://"):
-                    # file:///Users/... (macOS/Linux) or file:///C:/... (Windows)
-                    # TODO: Windows paths need extra handling (leading /C: after strip)
                     folder_path = folder[7:]  # strip file://
+                    # Windows: file:///C:/Users/... → /C:/Users/... → C:/Users/...
+                    if len(folder_path) >= 3 and folder_path[0] == "/" and folder_path[2] == ":":
+                        folder_path = folder_path[1:]
                     if folder_path.rstrip("/") == project_str.rstrip("/"):
                         return d
             except (json.JSONDecodeError, OSError):
