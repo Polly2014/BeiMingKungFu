@@ -1,5 +1,9 @@
 """
 SoulPort scanner — discovers agent workspace files and categorizes them into layers.
+
+This module provides backward-compatible helper functions used throughout SoulPort.
+Framework-specific logic lives in soulport.adapters.*; this module delegates to
+the adapter registry when a framework needs to be detected or queried.
 """
 
 import os
@@ -11,7 +15,7 @@ from typing import Optional
 from .manifest import ManifestLayer
 
 
-# ── Layer definitions ──────────────────────────────────────────────
+# ── Layer definitions (OpenClaw default, kept for backward compat) ─
 
 LAYER_DEFINITIONS = {
     "identity": {
@@ -80,13 +84,22 @@ def redact_config(config: dict, path: str = "") -> tuple[dict, list[str]]:
     return redacted, redacted_paths
 
 
-def scan_workspace(workspace_path: str | Path) -> list[ManifestLayer]:
+def scan_workspace(
+    workspace_path: str | Path,
+    layer_defs: Optional[dict[str, dict]] = None,
+) -> list[ManifestLayer]:
     """
     Scan an agent workspace directory and categorize files into layers.
+
+    Args:
+        workspace_path: Root directory to scan.
+        layer_defs: Custom layer definitions. Defaults to LAYER_DEFINITIONS (OpenClaw).
     """
     workspace = Path(workspace_path)
     if not workspace.exists():
         raise FileNotFoundError(f"Workspace not found: {workspace}")
+
+    definitions = layer_defs or LAYER_DEFINITIONS
     
     # Collect all files from workspace
     all_files: set[str] = set()
@@ -112,7 +125,7 @@ def scan_workspace(workspace_path: str | Path) -> list[ManifestLayer]:
     layers: list[ManifestLayer] = []
     claimed: set[str] = set()
     
-    for layer_name, layer_def in LAYER_DEFINITIONS.items():
+    for layer_name, layer_def in definitions.items():
         if layer_name == "projects":
             continue  # handle last as catch-all
         

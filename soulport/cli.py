@@ -60,7 +60,7 @@ def main():
 
 @main.command()
 @click.option("--workspace", "-w", type=click.Path(exists=True), default=None,
-              help="Agent workspace path (auto-detects OpenClaw)")
+              help="Agent workspace path (auto-detects)")
 @click.option("--output", "-o", type=click.Path(), default=None,
               help="Output .bm file path")
 @click.option("--name", "-n", default=None,
@@ -71,17 +71,28 @@ def main():
               help="Skip system config export")
 @click.option("--layers", "-l", multiple=True,
               help="Only export specific layers (identity, memory, config, skills). Repeatable.")
-def export(workspace, output, name, include_projects, no_config, layers):
+@click.option("--framework", "-f", default=None,
+              help="Framework (openclaw, claude-code). Auto-detects if omitted.")
+@click.option("--project-dir", "-p", type=click.Path(exists=True), default=None,
+              help="Project root directory (for Claude Code and similar)")
+@click.option("--include-global", is_flag=True, default=False,
+              help="Include global config (~/.claude/settings.json etc.)")
+def export(workspace, output, name, include_projects, no_config, layers,
+           framework, project_dir, include_global):
     """📤 Export your agent's soul to a .bm package.
 
     Use --layers to create a Soul Shard (partial export):
       soulport export --layers skills          # share just your skills
       soulport export -l memory -l identity    # memory + identity only
+
+    Use --framework for cross-framework export:
+      soulport export -f claude-code -p /path/to/project
     """
     console.print(BANNER)
     
     ws = Path(workspace) if workspace else None
     out = Path(output) if output else None
+    proj = Path(project_dir) if project_dir else None
     layer_list = list(layers) if layers else None
     
     try:
@@ -93,6 +104,9 @@ def export(workspace, output, name, include_projects, no_config, layers):
                 include_projects=include_projects,
                 name_override=name,
                 selected_layers=layer_list,
+                framework=framework,
+                project_dir=proj,
+                include_global=include_global,
             )
         
         # Show what was exported
@@ -969,6 +983,90 @@ def _print_diff(result: SoulDiff, show_full: bool = False):
                     console.print(f"    [dim]... {len(d.diff_lines) - 50} more lines ({len(d.diff_lines)} total)[/]")
 
     console.print()
+
+
+# ── Frameworks ─────────────────────────────────────────────────────
+
+@main.command()
+def frameworks():
+    """🔌 List supported agent frameworks."""
+    console.print(BANNER)
+
+    from .adapters import list_adapters, get_adapter
+
+    console.print("[bold]Supported Frameworks:[/]\n")
+
+    for name in list_adapters():
+        adapter = get_adapter(name)
+        detected = adapter.detect()
+        status = "[green]✅ detected[/]" if detected else "[dim]not found[/]"
+        console.print(f"  • [bold]{adapter.display_name}[/] ({name})  {status}")
+
+        if detected:
+            ws = adapter.find_workspace()
+            if ws:
+                console.print(f"    Workspace: [dim]{ws}[/]")
+
+    console.print()
+
+
+@main.command()
+@click.argument("source", type=click.Path(exists=True))
+@click.option("--from", "from_framework", required=True,
+              help="Source framework (e.g. claude-code)")
+@click.option("--to", "to_framework", required=True,
+              help="Target framework (e.g. openclaw)")
+@click.option("--output", "-o", type=click.Path(), default=None,
+              help="Output .bm file path")
+def convert(source, from_framework, to_framework, output):
+    """🔄 Convert soul between frameworks.
+
+    Export from one framework and re-package for another:
+
+      soulport convert /path/to/project --from claude-code --to openclaw
+
+    Note: v1.0 exports from source framework into .bm format. Layer remapping
+    (e.g. CLAUDE.md → SOUL.md + AGENTS.md) is planned for a future version.
+    For now, absorb the .bm into the target and manually adjust layer files.
+    """
+    console.print(BANNER)
+
+    from .adapters import get_adapter
+
+    try:
+        src_adapter = get_adapter(from_framework)
+        dst_adapter = get_adapter(to_framework)
+    except ValueError as e:
+        console.print(f"[bold red]❌ {e}[/]")
+        sys.exit(1)
+
+    source_path = Path(source)
+
+    console.print(f"[bold]Converting:[/] {src_adapter.display_name} → {dst_adapter.display_name}")
+    console.print(f"[bold]Source:[/] {source_path}\n")
+
+    # Step 1: Export from source framework
+    out = Path(output) if output else None
+    try:
+        with console.status(f"[bold cyan]Exporting from {src_adapter.display_name}..."):
+            bm_path = export_soul(
+                framework=from_framework,
+                project_dir=source_path,
+                output=out,
+                include_global=True,
+            )
+
+        manifest = inspect_soul(bm_path)
+        _print_manifest(manifest, title=f"Converted Soul ({src_adapter.display_name} → {dst_adapter.display_name})")
+
+        file_size = bm_path.stat().st_size
+        console.print(f"\n[bold green]✅ Converted to:[/] {bm_path} ({_format_bytes(file_size)})")
+        console.print(f"\n[dim]To absorb into {dst_adapter.display_name}:[/]")
+        console.print(f"[bold]  soulport absorb {bm_path.name} -f {to_framework}[/]\n")
+
+    except (FileNotFoundError, ValueError) as e:
+        console.print(f"[bold red]❌ {e}[/]")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

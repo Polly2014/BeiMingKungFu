@@ -47,9 +47,10 @@ class Manifest:
     merge_strategy: str = ""                 # "file" or "semantic"
     encrypted: bool = False
     selected_layers: list[str] = field(default_factory=list)  # non-empty = Soul Shard
+    session_metadata: dict = field(default_factory=dict)  # lightweight session stats
     
     def to_dict(self) -> dict:
-        return {
+        d = {
             "version": self.version,
             "soulport_version": self.soulport_version,
             "agent_name": self.agent_name,
@@ -75,6 +76,9 @@ class Manifest:
             "encrypted": self.encrypted,
             "selected_layers": self.selected_layers,
         }
+        if self.session_metadata:
+            d["session_metadata"] = self.session_metadata
+        return d
     
     def to_json(self, indent: int = 2) -> str:
         return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
@@ -100,4 +104,5 @@ class Manifest:
             merge_strategy=data.get("merge_strategy", ""),
             encrypted=data.get("encrypted", False),
             selected_layers=data.get("selected_layers", []),
+            session_metadata=data.get("session_metadata", {}),
         )

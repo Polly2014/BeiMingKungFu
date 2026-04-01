@@ -34,49 +34,64 @@ def export_soul(
     include_projects: bool = False,
     name_override: Optional[str] = None,
     selected_layers: Optional[list[str]] = None,
+    framework: Optional[str] = None,
+    project_dir: Optional[Path] = None,
+    include_global: bool = False,
 ) -> Path:
     """
     Export an agent's soul to a .bm package.
     
     Args:
+        workspace: Explicit workspace path (overrides auto-detect).
+        framework: Framework name (e.g. "openclaw", "claude-code"). Auto-detects if None.
+        project_dir: Project root directory (for frameworks like Claude Code).
+        include_global: Include global-level config (e.g. ~/.claude/settings.json).
         selected_layers: If provided, only export these layers (e.g. ["skills", "memory"]).
                          When set, include_projects is ignored.
     
     Returns the path to the created .bm file.
     """
+    # Resolve adapter
+    adapter = _resolve_adapter(framework, project_dir)
+
     # Auto-detect workspace
     if workspace is None:
-        workspace = find_openclaw_workspace()
+        workspace = adapter.find_workspace(project_dir)
         if workspace is None:
             raise FileNotFoundError(
-                "Cannot find OpenClaw workspace. "
+                f"Cannot find {adapter.display_name} workspace. "
                 "Use --workspace to specify the path."
             )
     
     workspace = Path(workspace)
     
     # Detect agent name
-    agent_name = name_override or detect_agent_name(workspace)
+    agent_name = name_override or adapter.detect_agent_name(workspace)
     
-    # Scan workspace into layers
-    layers = scan_workspace(workspace)
+    # Scan workspace into layers using framework-specific layer definitions
+    layer_defs = adapter.get_layer_definitions()
+    layers = scan_workspace(workspace, layer_defs=layer_defs)
     
     # Filter layers
     if selected_layers:
         layers = [l for l in layers if l.name in selected_layers]
     elif not include_projects:
         layers = [l for l in layers if l.name != "projects"]
+
+    # Session metadata (lightweight, for manifest enrichment)
+    session_meta = adapter.get_session_metadata(project_dir)
     
     # Build manifest
     manifest = Manifest(
         soulport_version=__version__,
         agent_name=agent_name,
         source_host=platform.node(),
-        source_framework="openclaw",
+        source_framework=adapter.name,
         source_workspace=str(workspace),
         exported_at=datetime.now(timezone.utc).isoformat(),
         layers=layers,
         selected_layers=selected_layers or [],
+        session_metadata=session_meta,
     )
     
     # Generate output filename
@@ -99,25 +114,40 @@ def export_soul(
                 full_path = workspace / rel_path
                 if full_path.exists():
                     tar.add(full_path, arcname=f"workspace/{rel_path}")
-        
+
+        # Add extra export files (e.g. CLAUDE.md from project root)
+        for src_path, archive_path in adapter.get_extra_export_files(project_dir):
+            if src_path.exists():
+                tar.add(src_path, arcname=archive_path)
+
         # Add sanitized system config (skip if layer selection excludes it)
         if include_config and not selected_layers:
-            config_path = find_openclaw_config()
-            if config_path and config_path.exists():
-                raw = config_path.read_text(encoding="utf-8")
-                try:
-                    config_data = json.loads(raw)
-                    redacted, redacted_paths = redact_config(config_data)
-                    manifest.redacted_fields = redacted_paths
-                    
-                    config_bytes = json.dumps(
-                        redacted, indent=2, ensure_ascii=False
-                    ).encode("utf-8")
-                    info = tarfile.TarInfo(name="config/openclaw.json")
-                    info.size = len(config_bytes)
-                    tar.addfile(info, BytesIO(config_bytes))
-                except json.JSONDecodeError:
-                    pass  # skip if config is malformed
+            config_files = adapter.find_config_files(project_dir)
+            for cf in config_files:
+                # Skip global configs unless --include-global
+                if cf.is_global and not include_global:
+                    continue
+
+                if not cf.source_path.exists():
+                    continue
+
+                raw = cf.source_path.read_text(encoding="utf-8")
+                if cf.needs_redaction:
+                    try:
+                        config_data = json.loads(raw)
+                        redacted, redacted_paths = redact_config(config_data)
+                        manifest.redacted_fields.extend(redacted_paths)
+                        config_bytes = json.dumps(
+                            redacted, indent=2, ensure_ascii=False
+                        ).encode("utf-8")
+                    except json.JSONDecodeError:
+                        continue
+                else:
+                    config_bytes = raw.encode("utf-8")
+
+                info = tarfile.TarInfo(name=cf.archive_name)
+                info.size = len(config_bytes)
+                tar.addfile(info, BytesIO(config_bytes))
     
     # Compute content hash and rewrite manifest with it
     content_hash = _compute_file_hash(output)
@@ -135,17 +165,21 @@ def absorb_soul(
     layers: Optional[list[str]] = None,
     dry_run: bool = False,
     force: bool = False,
+    framework: Optional[str] = None,
+    project_dir: Optional[Path] = None,
 ) -> dict:
     """
     Absorb a .bm soul package into the current agent.
     
     Returns a summary of what was absorbed.
     """
+    adapter = _resolve_adapter(framework, project_dir)
+
     if target_workspace is None:
-        target_workspace = find_openclaw_workspace()
+        target_workspace = adapter.find_workspace(project_dir)
         if target_workspace is None:
             raise FileNotFoundError(
-                "Cannot find OpenClaw workspace. "
+                f"Cannot find {adapter.display_name} workspace. "
                 "Use --workspace to specify the path."
             )
     
@@ -793,3 +827,26 @@ def _text_diff(filename: str, old_bytes: bytes, new_bytes: bytes) -> list[str]:
         tofile=f"package/{filename}",
         n=3,
     ))
+
+
+# ── Adapter resolution ─────────────────────────────────────────────
+
+def _resolve_adapter(
+    framework: Optional[str] = None,
+    project_dir: Optional[Path] = None,
+):
+    """Resolve framework adapter by name or auto-detection.
+
+    Returns an adapter instance. Falls back to OpenClaw for backward compat.
+    """
+    from .adapters import detect_framework, get_adapter
+
+    if framework:
+        return get_adapter(framework)
+
+    detected = detect_framework(project_dir)
+    if detected:
+        return detected
+
+    # Fallback: OpenClaw (backward compat)
+    return get_adapter("openclaw")
