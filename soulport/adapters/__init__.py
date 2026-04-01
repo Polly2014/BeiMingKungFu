@@ -125,6 +125,9 @@ def list_adapters() -> list[str]:
 
 # ── Import adapters to trigger registration ───────────────────────
 # Order matters for detect_framework(): more specific adapters first.
+# Claude Code (.claude/) is checked before Copilot (.github/) because
+# a project may have both (e.g. www.polly.com), and Claude Code's soul
+# is typically richer. Use --framework to override.
 
 from . import claude_code  # noqa: E402, F401
 from . import copilot  # noqa: E402, F401

@@ -59,6 +59,8 @@ def _find_workspace_storage(project_dir: Path) -> Optional[Path]:
                 folder = data.get("folder", "")
                 # folder is a URI like file:///Users/polly/...
                 if folder.startswith("file://"):
+                    # file:///Users/... (macOS/Linux) or file:///C:/... (Windows)
+                    # TODO: Windows paths need extra handling (leading /C: after strip)
                     folder_path = folder[7:]  # strip file://
                     if folder_path.rstrip("/") == project_str.rstrip("/"):
                         return d
