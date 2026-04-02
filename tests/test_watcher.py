@@ -21,9 +21,9 @@ from soulport.watcher import (
 def _create_workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "workspace"
     ws.mkdir(parents=True, exist_ok=True)
-    (ws / "SOUL.md").write_text("# My Agent\nI am helpful.")
-    (ws / "IDENTITY.md").write_text("- **Name:** TestBot\n🤖")
-    (ws / "MEMORY.md").write_text("# Memory\n- Learned testing")
+    (ws / "SOUL.md").write_text("# My Agent\nI am helpful.", encoding="utf-8")
+    (ws / "IDENTITY.md").write_text("- **Name:** TestBot\n🤖", encoding="utf-8")
+    (ws / "MEMORY.md").write_text("# Memory\n- Learned testing", encoding="utf-8")
     return ws
 
 
@@ -64,7 +64,7 @@ class TestWorkspaceFingerprint:
     def test_modified_workspace_different_fingerprint(self, tmp_path):
         ws = _create_workspace(tmp_path)
         fp1 = workspace_fingerprint(ws)
-        (ws / "SOUL.md").write_text("# Changed content")
+        (ws / "SOUL.md").write_text("# Changed content", encoding="utf-8")
         fp2 = workspace_fingerprint(ws)
         assert fp1 != fp2
 
@@ -112,7 +112,7 @@ class TestTakeSnapshot:
         parent_hash = inspect_soul(first).content_hash
         # Need 1.1s sleep: fingerprint uses int(mtime), filename has seconds
         import time; time.sleep(1.1)
-        (ws / "SOUL.md").write_text("# Completely different soul after change")
+        (ws / "SOUL.md").write_text("# Completely different soul after change", encoding="utf-8")
         second = take_snapshot(ws, snap_dir, parent_hash=parent_hash, skip_if_unchanged=True)
         assert second is not None
 
@@ -122,7 +122,7 @@ class TestTakeSnapshot:
         first = take_snapshot(ws, snap_dir)
         parent_hash = inspect_soul(first).content_hash
         import time; time.sleep(1.1)
-        (ws / "SOUL.md").write_text("# Updated soul for lineage test - new content")
+        (ws / "SOUL.md").write_text("# Updated soul for lineage test - new content", encoding="utf-8")
         second = take_snapshot(ws, snap_dir, parent_hash=parent_hash, skip_if_unchanged=False)
         assert second is not None
         manifest = inspect_soul(second)
@@ -137,7 +137,7 @@ class TestSnapshotQueries:
         snap_dir = tmp_path / "snapshots"
         take_snapshot(ws, snap_dir)
         import time; time.sleep(1.1)  # different second → different filename
-        (ws / "SOUL.md").write_text("# v2 changed")
+        (ws / "SOUL.md").write_text("# v2 changed", encoding="utf-8")
         take_snapshot(ws, snap_dir, skip_if_unchanged=False)
         snaps = list_snapshots(snap_dir)
         assert len(snaps) == 2
@@ -185,7 +185,7 @@ class TestSnapshotQueries:
         snap_dir = tmp_path / "snapshots"
         take_snapshot(ws, snap_dir)
         import time; time.sleep(1.1)
-        (ws / "SOUL.md").write_text("# Changed for ambiguous test")
+        (ws / "SOUL.md").write_text("# Changed for ambiguous test", encoding="utf-8")
         take_snapshot(ws, snap_dir, skip_if_unchanged=False)
         # Both hashes start with some common hex chars — use empty prefix
         with pytest.raises(ValueError, match="Ambiguous"):
@@ -200,7 +200,7 @@ class TestCleanup:
         snap_dir = tmp_path / "snapshots"
         import time
         for i in range(5):
-            (ws / "SOUL.md").write_text(f"# Version {i} with unique content")
+            (ws / "SOUL.md").write_text(f"# Version {i} with unique content", encoding="utf-8")
             time.sleep(1.1)  # different second → different filename
             take_snapshot(ws, snap_dir, skip_if_unchanged=False)
         assert len(list(snap_dir.glob("*.bm"))) == 5
@@ -213,7 +213,7 @@ class TestCleanup:
         snap_dir = tmp_path / "snapshots"
         import time
         for i in range(3):
-            (ws / "SOUL.md").write_text(f"# Version {i} cleanup fp test")
+            (ws / "SOUL.md").write_text(f"# Version {i} cleanup fp test", encoding="utf-8")
             time.sleep(1.1)
             take_snapshot(ws, snap_dir, skip_if_unchanged=False)
         cleanup_old_snapshots(snap_dir, keep=1)

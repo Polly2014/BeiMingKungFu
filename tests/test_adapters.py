@@ -45,13 +45,13 @@ class TestAdapterRegistry:
 
     def test_detect_framework_with_claude_dir(self, tmp_path):
         (tmp_path / ".claude").mkdir()
-        (tmp_path / ".claude" / "settings.json").write_text("{}")
+        (tmp_path / ".claude" / "settings.json").write_text("{}", encoding="utf-8")
         detected = detect_framework(tmp_path)
         assert detected is not None
         assert detected.name == "claude-code"
 
     def test_detect_framework_with_claude_md(self, tmp_path):
-        (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md")
+        (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md", encoding="utf-8")
         detected = detect_framework(tmp_path)
         assert detected is not None
         assert detected.name == "claude-code"
@@ -72,7 +72,7 @@ class TestOpenClawAdapter:
 
     def test_detect_agent_name_from_identity(self, tmp_path):
         adapter = OpenClawAdapter()
-        (tmp_path / "IDENTITY.md").write_text("- **Name:** 小龙虾\n- **Role:** AI Assistant")
+        (tmp_path / "IDENTITY.md").write_text("- **Name:** 小龙虾\n- **Role:** AI Assistant", encoding="utf-8")
         assert adapter.detect_agent_name(tmp_path) == "小龙虾"
 
     def test_detect_agent_name_fallback(self, tmp_path):
@@ -98,7 +98,7 @@ class TestClaudeCodeAdapter:
 
     def test_detect_with_claude_md(self, tmp_path):
         adapter = ClaudeCodeAdapter()
-        (tmp_path / "CLAUDE.md").write_text("# Project Guide")
+        (tmp_path / "CLAUDE.md").write_text("# Project Guide", encoding="utf-8")
         assert adapter.detect(tmp_path) is True
 
     def test_detect_empty_dir(self, tmp_path):
@@ -113,7 +113,7 @@ class TestClaudeCodeAdapter:
 
     def test_find_workspace_with_claude_md(self, tmp_path):
         adapter = ClaudeCodeAdapter()
-        (tmp_path / "CLAUDE.md").write_text("# Test")
+        (tmp_path / "CLAUDE.md").write_text("# Test", encoding="utf-8")
         ws = adapter.find_workspace(tmp_path)
         assert ws == tmp_path
 
@@ -123,17 +123,17 @@ class TestClaudeCodeAdapter:
 
     def test_detect_agent_name_from_claude_md(self, tmp_path):
         adapter = ClaudeCodeAdapter()
-        (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md - SoulPort\n\nSome content")
+        (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md - SoulPort\n\nSome content", encoding="utf-8")
         assert adapter.detect_agent_name(tmp_path) == "SoulPort"
 
     def test_detect_agent_name_simple_title(self, tmp_path):
         adapter = ClaudeCodeAdapter()
-        (tmp_path / "CLAUDE.md").write_text("# My Project\n\nGuide content")
+        (tmp_path / "CLAUDE.md").write_text("# My Project\n\nGuide content", encoding="utf-8")
         assert adapter.detect_agent_name(tmp_path) == "My Project"
 
     def test_detect_agent_name_plain_claude_md(self, tmp_path):
         adapter = ClaudeCodeAdapter()
-        (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md\n\nJust a guide")
+        (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md\n\nJust a guide", encoding="utf-8")
         # Falls back to directory name since title is just "CLAUDE.md"
         assert adapter.detect_agent_name(tmp_path) == tmp_path.name
 
@@ -143,7 +143,7 @@ class TestClaudeCodeAdapter:
 
     def test_detect_agent_name_em_dash(self, tmp_path):
         adapter = ClaudeCodeAdapter()
-        (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md — Jarvis Agent\n")
+        (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md — Jarvis Agent\n", encoding="utf-8")
         assert adapter.detect_agent_name(tmp_path) == "Jarvis Agent"
 
     def test_layer_definitions(self):
@@ -161,9 +161,9 @@ class TestClaudeCodeAdapter:
         claude_dir = tmp_path / ".claude"
         claude_dir.mkdir()
         settings = claude_dir / "settings.json"
-        settings.write_text('{"env": {"KEY": "val"}}')
+        settings.write_text('{"env": {"KEY": "val"}}', encoding="utf-8")
         local = claude_dir / "settings.local.json"
-        local.write_text('{"permissions": {"allow": []}}')
+        local.write_text('{"permissions": {"allow": []}}', encoding="utf-8")
 
         configs = adapter.find_config_files(tmp_path)
         # At least project-level ones
@@ -188,7 +188,7 @@ class TestClaudeCodeAdapter:
 
     def test_get_extra_export_files(self, tmp_path):
         adapter = ClaudeCodeAdapter()
-        (tmp_path / "CLAUDE.md").write_text("# Test Project")
+        (tmp_path / "CLAUDE.md").write_text("# Test Project", encoding="utf-8")
         extras = adapter.get_extra_export_files(tmp_path)
         assert len(extras) == 1
         assert extras[0][0] == tmp_path / "CLAUDE.md"
@@ -222,14 +222,14 @@ class TestCopilotAdapter:
         adapter = CopilotAdapter()
         gh = tmp_path / ".github"
         gh.mkdir()
-        (gh / "copilot-instructions.md").write_text("# Instructions")
+        (gh / "copilot-instructions.md").write_text("# Instructions", encoding="utf-8")
         assert adapter.detect(tmp_path) is True
 
     def test_detect_with_prompts(self, tmp_path):
         adapter = CopilotAdapter()
         prompts = tmp_path / ".github" / "prompts"
         prompts.mkdir(parents=True)
-        (prompts / "test.prompt.md").write_text("# Test prompt")
+        (prompts / "test.prompt.md").write_text("# Test prompt", encoding="utf-8")
         assert adapter.detect(tmp_path) is True
 
     def test_detect_empty_dir(self, tmp_path):
@@ -244,7 +244,7 @@ class TestCopilotAdapter:
         adapter = CopilotAdapter()
         gh = tmp_path / ".github"
         gh.mkdir()
-        (gh / "copilot-instructions.md").write_text("# Guide")
+        (gh / "copilot-instructions.md").write_text("# Guide", encoding="utf-8")
         ws = adapter.find_workspace(tmp_path)
         assert ws == tmp_path
 
@@ -256,7 +256,7 @@ class TestCopilotAdapter:
         adapter = CopilotAdapter()
         gh = tmp_path / ".github"
         gh.mkdir()
-        (gh / "copilot-instructions.md").write_text("# My Awesome Project\n\nSome guide")
+        (gh / "copilot-instructions.md").write_text("# My Awesome Project\n\nSome guide", encoding="utf-8")
         assert adapter.detect_agent_name(tmp_path) == "My Awesome Project"
 
     def test_detect_agent_name_fallback(self, tmp_path):
@@ -266,7 +266,7 @@ class TestCopilotAdapter:
     def test_detect_agent_name_symlink_to_claude_md(self, tmp_path):
         adapter = CopilotAdapter()
         # Create CLAUDE.md and symlink
-        (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md - SoulPort\n\nProject guide")
+        (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md - SoulPort\n\nProject guide", encoding="utf-8")
         gh = tmp_path / ".github"
         gh.mkdir()
         (gh / "copilot-instructions.md").symlink_to(tmp_path / "CLAUDE.md")
@@ -285,7 +285,7 @@ class TestCopilotAdapter:
         adapter = CopilotAdapter()
         vscode = tmp_path / ".vscode"
         vscode.mkdir()
-        (vscode / "settings.json").write_text('{"editor.fontSize": 14}')
+        (vscode / "settings.json").write_text('{"editor.fontSize": 14}', encoding="utf-8")
         configs = adapter.find_config_files(tmp_path)
         proj_configs = [c for c in configs if not c.is_global]
         assert len(proj_configs) == 1
@@ -301,7 +301,7 @@ class TestCopilotAdapter:
         """Copilot project should be detected."""
         gh = tmp_path / ".github"
         gh.mkdir()
-        (gh / "copilot-instructions.md").write_text("# Guide")
+        (gh / "copilot-instructions.md").write_text("# Guide", encoding="utf-8")
         detected = detect_framework(tmp_path)
         assert detected is not None
         assert detected.name == "copilot"
@@ -322,7 +322,7 @@ class TestWorkspaceStorageDiscovery:
         # Write workspace.json with Windows-style file URI
         (ws_dir / "workspace.json").write_text(
             '{"folder": "file:///C:/Users/polly/project"}'
-        )
+        , encoding="utf-8")
 
         # Monkeypatch the storage base to our tmp
         monkeypatch.setattr(
@@ -361,18 +361,18 @@ class TestCopilotScan:
         # Identity
         gh = tmp_path / ".github"
         gh.mkdir()
-        (gh / "copilot-instructions.md").write_text("# Project Guide")
+        (gh / "copilot-instructions.md").write_text("# Project Guide", encoding="utf-8")
 
         # Skills (prompts)
         prompts = gh / "prompts"
         prompts.mkdir()
-        (prompts / "BlogWriter.prompt.md").write_text("---\nmode: agent\n---\nWrite blogs")
-        (prompts / "CodeReview.prompt.md").write_text("---\nmode: agent\n---\nReview code")
+        (prompts / "BlogWriter.prompt.md").write_text("---\nmode: agent\n---\nWrite blogs", encoding="utf-8")
+        (prompts / "CodeReview.prompt.md").write_text("---\nmode: agent\n---\nReview code", encoding="utf-8")
 
         # Config
         vscode = tmp_path / ".vscode"
         vscode.mkdir()
-        (vscode / "settings.json").write_text("{}")
+        (vscode / "settings.json").write_text("{}", encoding="utf-8")
 
         adapter = CopilotAdapter()
         layers = scan_workspace(tmp_path, layer_defs=adapter.get_layer_definitions())
@@ -395,10 +395,10 @@ class TestCopilotScan:
         project.mkdir()
         gh = project / ".github"
         gh.mkdir()
-        (gh / "copilot-instructions.md").write_text("# CLAUDE.md - TestBot\n\nHello")
+        (gh / "copilot-instructions.md").write_text("# CLAUDE.md - TestBot\n\nHello", encoding="utf-8")
         prompts = gh / "prompts"
         prompts.mkdir()
-        (prompts / "Writer.prompt.md").write_text("Write things")
+        (prompts / "Writer.prompt.md").write_text("Write things", encoding="utf-8")
 
         output = tmp_path / "test.bm"
         result = export_soul(
@@ -424,24 +424,24 @@ class TestClaudeCodeScan:
         from soulport.scanner import scan_workspace
 
         # Identity
-        (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md - TestAgent\n\nProject guide")
+        (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md - TestAgent\n\nProject guide", encoding="utf-8")
 
         # Config
         claude_dir = tmp_path / ".claude"
         claude_dir.mkdir()
-        (claude_dir / "settings.json").write_text('{"env": {}}')
-        (claude_dir / "settings.local.json").write_text('{"permissions": {}}')
+        (claude_dir / "settings.json").write_text('{"env": {}}', encoding="utf-8")
+        (claude_dir / "settings.local.json").write_text('{"permissions": {}}', encoding="utf-8")
 
         # Skills
         skill_dir = claude_dir / "skills" / "test-skill"
         skill_dir.mkdir(parents=True)
-        (skill_dir / "SKILL.md").write_text("# Test Skill\nDoes testing")
-        (skill_dir / "helper.py").write_text("print('hello')")
+        (skill_dir / "SKILL.md").write_text("# Test Skill\nDoes testing", encoding="utf-8")
+        (skill_dir / "helper.py").write_text("print('hello')", encoding="utf-8")
 
         # Memory (personal context)
         ctx_dir = tmp_path / "_personal_context"
         ctx_dir.mkdir()
-        (ctx_dir / "notes.md").write_text("Some personal context")
+        (ctx_dir / "notes.md").write_text("Some personal context", encoding="utf-8")
 
         adapter = ClaudeCodeAdapter()
         layers = scan_workspace(tmp_path, layer_defs=adapter.get_layer_definitions())
@@ -468,13 +468,13 @@ class TestClaudeCodeScan:
         """Files should only appear in one layer."""
         from soulport.scanner import scan_workspace
 
-        (tmp_path / "CLAUDE.md").write_text("# Guide")
+        (tmp_path / "CLAUDE.md").write_text("# Guide", encoding="utf-8")
         claude_dir = tmp_path / ".claude"
         claude_dir.mkdir()
-        (claude_dir / "settings.json").write_text("{}")
+        (claude_dir / "settings.json").write_text("{}", encoding="utf-8")
         skill_dir = claude_dir / "skills" / "s1"
         skill_dir.mkdir(parents=True)
-        (skill_dir / "SKILL.md").write_text("# S1")
+        (skill_dir / "SKILL.md").write_text("# S1", encoding="utf-8")
 
         adapter = ClaudeCodeAdapter()
         layers = scan_workspace(tmp_path, layer_defs=adapter.get_layer_definitions())
@@ -495,13 +495,13 @@ class TestClaudeCodeExport:
         # Build minimal Claude Code project
         project = tmp_path / "myproject"
         project.mkdir()
-        (project / "CLAUDE.md").write_text("# CLAUDE.md - MyAgent\n\nProject guide here")
+        (project / "CLAUDE.md").write_text("# CLAUDE.md - MyAgent\n\nProject guide here", encoding="utf-8")
         claude_dir = project / ".claude"
         claude_dir.mkdir()
-        (claude_dir / "settings.json").write_text('{"env": {"MODEL": "opus"}}')
+        (claude_dir / "settings.json").write_text('{"env": {"MODEL": "opus"}}', encoding="utf-8")
         skill_dir = claude_dir / "skills" / "code-review"
         skill_dir.mkdir(parents=True)
-        (skill_dir / "SKILL.md").write_text("# Code Review Skill")
+        (skill_dir / "SKILL.md").write_text("# Code Review Skill", encoding="utf-8")
 
         output = tmp_path / "test.bm"
         result = export_soul(

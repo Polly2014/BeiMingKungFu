@@ -121,8 +121,8 @@ class TestScanWorkspace:
     """Test workspace scanning and layer categorization."""
 
     def test_scan_identity_layer(self, tmp_path):
-        (tmp_path / "SOUL.md").write_text("# My Soul")
-        (tmp_path / "IDENTITY.md").write_text("# Identity")
+        (tmp_path / "SOUL.md").write_text("# My Soul", encoding="utf-8")
+        (tmp_path / "IDENTITY.md").write_text("# Identity", encoding="utf-8")
         layers = scan_workspace(tmp_path)
         identity = next(l for l in layers if l.name == "identity")
         assert "SOUL.md" in identity.files
@@ -131,8 +131,8 @@ class TestScanWorkspace:
     def test_scan_memory_layer(self, tmp_path):
         mem_dir = tmp_path / "memory" / "2026"
         mem_dir.mkdir(parents=True)
-        (tmp_path / "MEMORY.md").write_text("# Memory")
-        (mem_dir / "0330.md").write_text("Today")
+        (tmp_path / "MEMORY.md").write_text("# Memory", encoding="utf-8")
+        (mem_dir / "0330.md").write_text("Today", encoding="utf-8")
         layers = scan_workspace(tmp_path)
         memory = next(l for l in layers if l.name == "memory")
         assert "MEMORY.md" in memory.files
@@ -141,14 +141,14 @@ class TestScanWorkspace:
     def test_scan_skills_layer(self, tmp_path):
         skill_dir = tmp_path / "skills" / "translate"
         skill_dir.mkdir(parents=True)
-        (skill_dir / "SKILL.md").write_text("# Translate Skill")
+        (skill_dir / "SKILL.md").write_text("# Translate Skill", encoding="utf-8")
         layers = scan_workspace(tmp_path)
         skills = next(l for l in layers if l.name == "skills")
         assert "skills/translate/SKILL.md" in skills.files
 
     def test_scan_config_layer(self, tmp_path):
-        (tmp_path / "AGENTS.md").write_text("# Agents")
-        (tmp_path / "TOOLS.md").write_text("# Tools")
+        (tmp_path / "AGENTS.md").write_text("# Agents", encoding="utf-8")
+        (tmp_path / "TOOLS.md").write_text("# Tools", encoding="utf-8")
         layers = scan_workspace(tmp_path)
         config = next(l for l in layers if l.name == "config")
         assert "AGENTS.md" in config.files
@@ -160,24 +160,24 @@ class TestScanWorkspace:
 
     def test_skip_patterns_excluded(self, tmp_path):
         (tmp_path / ".git").mkdir()
-        (tmp_path / ".git" / "config").write_text("git stuff")
+        (tmp_path / ".git" / "config").write_text("git stuff", encoding="utf-8")
         (tmp_path / "__pycache__").mkdir()
-        (tmp_path / "__pycache__" / "mod.pyc").write_text("bytecode")
-        (tmp_path / "SOUL.md").write_text("# Soul")
+        (tmp_path / "__pycache__" / "mod.pyc").write_text("bytecode", encoding="utf-8")
+        (tmp_path / "SOUL.md").write_text("# Soul", encoding="utf-8")
         layers = scan_workspace(tmp_path)
         all_files = [f for l in layers for f in l.files]
         assert not any(".git" in f for f in all_files)
         assert not any("__pycache__" in f for f in all_files)
 
     def test_remaining_files_go_to_projects(self, tmp_path):
-        (tmp_path / "random.txt").write_text("hello")
+        (tmp_path / "random.txt").write_text("hello", encoding="utf-8")
         layers = scan_workspace(tmp_path)
         projects = next(l for l in layers if l.name == "projects")
         assert "random.txt" in projects.files
 
     def test_file_count_and_bytes(self, tmp_path):
         content = "Hello World"
-        (tmp_path / "SOUL.md").write_text(content)
+        (tmp_path / "SOUL.md").write_text(content, encoding="utf-8")
         layers = scan_workspace(tmp_path)
         identity = next(l for l in layers if l.name == "identity")
         assert identity.file_count == 1

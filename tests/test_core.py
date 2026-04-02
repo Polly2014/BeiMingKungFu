@@ -23,13 +23,13 @@ def _create_workspace(tmp_path: Path) -> Path:
     """Create a minimal valid workspace for testing."""
     ws = tmp_path / "workspace"
     ws.mkdir(parents=True, exist_ok=True)
-    (ws / "SOUL.md").write_text("# My Agent\nI am a helpful assistant.")
-    (ws / "IDENTITY.md").write_text("Name: TestBot\n🤖")
-    (ws / "MEMORY.md").write_text("# Memory\n- Learned Python today")
-    (ws / "AGENTS.md").write_text("# Agent Config\n- Be helpful")
+    (ws / "SOUL.md").write_text("# My Agent\nI am a helpful assistant.", encoding="utf-8")
+    (ws / "IDENTITY.md").write_text("Name: TestBot\n🤖", encoding="utf-8")
+    (ws / "MEMORY.md").write_text("# Memory\n- Learned Python today", encoding="utf-8")
+    (ws / "AGENTS.md").write_text("# Agent Config\n- Be helpful", encoding="utf-8")
     skill_dir = ws / "skills" / "coding"
     skill_dir.mkdir(parents=True)
-    (skill_dir / "SKILL.md").write_text("# Coding Skill\nWrite clean code.")
+    (skill_dir / "SKILL.md").write_text("# Coding Skill\nWrite clean code.", encoding="utf-8")
     return ws
 
 
@@ -210,7 +210,7 @@ class TestAbsorb:
         bm = _create_bm(tmp_path, ws)
         target = tmp_path / "target_ws"
         target.mkdir()
-        (target / "SOUL.md").write_text("Existing content")
+        (target / "SOUL.md").write_text("Existing content", encoding="utf-8")
         summary = absorb_soul(bm, target_workspace=target, force=False)
         assert len(summary["conflicts"]) > 0
         # Existing file should NOT be overwritten
@@ -230,7 +230,7 @@ class TestAbsorb:
         """Verify that absorb scans package files for __SOULPORT_REDACTED__ markers."""
         ws = _create_workspace(tmp_path)
         # Write a file with a REDACTED marker into the workspace
-        (ws / "AGENTS.md").write_text("api_key: __SOULPORT_REDACTED__\nmodel: gpt-4")
+        (ws / "AGENTS.md").write_text("api_key: __SOULPORT_REDACTED__\nmodel: gpt-4", encoding="utf-8")
         bm = _create_bm(tmp_path, ws)
         target = tmp_path / "target_ws"
         target.mkdir()
@@ -277,7 +277,7 @@ class TestAbsorb:
     def test_absorb_dry_run_shows_redacted(self, tmp_path):
         """Verify that dry_run mode also reports REDACTED markers."""
         ws = _create_workspace(tmp_path)
-        (ws / "AGENTS.md").write_text("token: __SOULPORT_REDACTED__")
+        (ws / "AGENTS.md").write_text("token: __SOULPORT_REDACTED__", encoding="utf-8")
         bm = _create_bm(tmp_path, ws)
         target = tmp_path / "target_ws"
         target.mkdir()
@@ -329,7 +329,7 @@ class TestDiff:
         ws = _create_workspace(tmp_path)
         bm = _create_bm(tmp_path, ws)
         # Modify workspace after export
-        (ws / "SOUL.md").write_text("# Changed Agent")
+        (ws / "SOUL.md").write_text("# Changed Agent", encoding="utf-8")
         result = diff_soul(bm, workspace=ws)
         modified_files = [d.rel_path for d in result.modified]
         assert "SOUL.md" in modified_files
@@ -346,7 +346,7 @@ class TestDiff:
     def test_diff_packages(self, tmp_path):
         ws = _create_workspace(tmp_path)
         bm1 = _create_bm(tmp_path, ws, name="v1")
-        (ws / "SOUL.md").write_text("# Updated Soul")
+        (ws / "SOUL.md").write_text("# Updated Soul", encoding="utf-8")
         bm2 = _create_bm(tmp_path, ws, name="v2")
         result = diff_packages(bm1, bm2)
         modified_files = [d.rel_path for d in result.modified]
@@ -360,10 +360,10 @@ class TestMerge:
         ws1 = _create_workspace(tmp_path / "ws1_parent")
         ws2 = _create_workspace(tmp_path / "ws2_parent")
         # Make ws2 different
-        (ws2 / "SOUL.md").write_text("# Second Agent\nI am different.")
+        (ws2 / "SOUL.md").write_text("# Second Agent\nI am different.", encoding="utf-8")
         mem_dir = ws2 / "memory" / "extra"
         mem_dir.mkdir(parents=True)
-        (mem_dir / "new.md").write_text("# New memory")
+        (mem_dir / "new.md").write_text("# New memory", encoding="utf-8")
 
         bm1 = _create_bm(tmp_path, ws1, name="a")
         bm2 = _create_bm(tmp_path, ws2, name="b")
