@@ -276,6 +276,84 @@ def inspect_soul(package_path: Path) -> Manifest:
     return _read_manifest(package_path)
 
 
+def read_soul(
+    package_path: Path,
+    max_bytes_per_file: int = 100_000,
+) -> dict[str, dict[str, str]]:
+    """
+    Extract file contents from a .bm package, organized by layer.
+
+    Reads the manifest to determine layer membership, then extracts text
+    content from tar. Framework-agnostic: works with OpenClaw, Claude Code,
+    and GitHub Copilot .bm packages.
+
+    Args:
+        package_path: Path to the .bm file.
+        max_bytes_per_file: Maximum bytes to read per file (default 100KB).
+
+    Returns:
+        dict mapping layer name to {filename: content} dict.
+        Example::
+
+            {
+                "identity": {"SOUL.md": "...", "IDENTITY.md": "..."},
+                "memory": {"MEMORY.md": "...", "memory/2026-04-01.md": "..."},
+                "config": {"AGENTS.md": "..."},
+                "skills": {"blog-writer/SKILL.md": "..."},
+            }
+
+    Raises:
+        FileNotFoundError: If package_path does not exist.
+        ValueError: If the .bm file is invalid (missing manifest.json).
+    """
+    manifest = _read_manifest(package_path)
+
+    # Build layer lookup: filename → layer name
+    file_to_layer: dict[str, str] = {}
+    for layer in manifest.layers:
+        for f in layer.files:
+            file_to_layer[f] = layer.name
+
+    result: dict[str, dict[str, str]] = {}
+    for layer in manifest.layers:
+        result[layer.name] = {}
+
+    with tarfile.open(package_path, "r:gz") as tar:
+        for member in tar.getmembers():
+            if not member.isfile():
+                continue
+            # SECURITY: reject symlinks, absolute paths, traversal
+            if member.issym() or member.islnk():
+                continue
+            if member.name.startswith("/") or ".." in member.name:
+                continue
+
+            # Strip workspace/ prefix to match manifest file paths
+            rel = member.name
+            if rel.startswith("workspace/"):
+                rel = rel[len("workspace/"):]
+            elif rel == "manifest.json":
+                continue
+
+            layer_name = file_to_layer.get(rel)
+            if layer_name is None:
+                continue
+
+            f = tar.extractfile(member)
+            if f is None:
+                continue
+
+            raw = f.read(max_bytes_per_file)
+            try:
+                content = raw.decode("utf-8", errors="replace")
+            except Exception:
+                continue
+
+            result[layer_name][rel] = content
+
+    return result
+
+
 def merge_souls(
     packages: list[Path],
     output: Optional[Path] = None,
