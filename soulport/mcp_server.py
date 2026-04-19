@@ -284,6 +284,59 @@ def soulport_snapshot(
         return f"❌ Snapshot failed: {e}"
 
 
+@mcp.tool()
+def soulport_score(package: str) -> str:
+    """⭐ Score a soul package across five dimensions (stats-only, offline).
+
+    Returns a human-readable scorecard: memory depth, personality richness,
+    habit maturity, skill breadth, uniqueness, plus a weighted total (0-100).
+
+    This is the statistical baseline — no LLM calls, no network. For LLM-
+    augmented scoring + biography generation, upload to soul.polly.wang.
+
+    Args:
+        package: Path to a .bm file to score.
+    """
+    from .scorer import score_soul
+    from .tiers import tier_from_score
+
+    pkg = Path(package)
+    if not pkg.is_file():
+        return f"❌ Package not found: {package}"
+
+    try:
+        scores, analysis = score_soul(pkg)
+    except (FileNotFoundError, ValueError) as e:
+        return f"❌ {e}"
+
+    total = scores.total_score
+    tier = tier_from_score(total)
+
+    lines = [
+        f"⭐ Soul Score for {analysis.get('agent_name', '?')}",
+        f"   Framework: {analysis.get('source_framework') or '—'}",
+        f"   Tier: T{tier.tier} {tier.name} {tier.name_zh}  {tier.star_display}  ({tier.score_range})",
+        f"   Total: {total}/100",
+        "",
+    ]
+    for d in (
+        scores.memory_depth,
+        scores.personality_richness,
+        scores.habit_maturity,
+        scores.skill_breadth,
+        scores.uniqueness,
+    ):
+        # ASCII-only bar (LLM-friendly, renders in any terminal/client)
+        filled = int(d.raw_score / 10)
+        bar = "[" + "=" * filled + " " * (10 - filled) + "]"
+        lines.append(
+            f"  {d.emoji} {d.name_zh:8s} {d.raw_score:5.1f}/100  x{int(d.weight*100)}%  {bar}"
+        )
+    lines.append("")
+    lines.append("Upload to soul.polly.wang for LLM-augmented scoring + biography.")
+    return "\n".join(lines)
+
+
 # ── Entry point ────────────────────────────────────────────────────
 
 def main():

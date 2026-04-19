@@ -3,9 +3,11 @@
 import pytest
 from pathlib import Path
 
+from soulport.core import export_soul
 from soulport.doctor import (
     CheckResult,
     DoctorReport,
+    check_package_health,
     check_soul_health,
     _extract_dates_from_paths,
 )
@@ -163,3 +165,72 @@ class TestExtractDates:
         paths = [tmp_path / "memory" / "2026" / "2026-03-30.md"]
         dates = _extract_dates_from_paths(paths)
         assert len(dates) == 1
+
+
+# ── Package-level health check ───────────────────────────────────
+
+def _mk_ws(tmp_path: Path) -> Path:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "IDENTITY.md").write_text("Name: Tester\n🤖\nRole: QA", encoding="utf-8")
+    (ws / "SOUL.md").write_text("# Personality\n" * 30, encoding="utf-8")
+    (ws / "MEMORY.md").write_text("# Memory\n- stuff\n", encoding="utf-8")
+    (ws / "AGENTS.md").write_text("Must be kind. Always ship tests.", encoding="utf-8")
+    mem = ws / "memory"
+    mem.mkdir()
+    (mem / "2026-04-18.md").write_text("yesterday", encoding="utf-8")
+    (mem / "2026-04-19.md").write_text("today", encoding="utf-8")
+    skills_dir = ws / "skills" / "writer"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "SKILL.md").write_text("# writer", encoding="utf-8")
+    return ws
+
+
+class TestCheckPackageHealth:
+    def test_runs_on_exported_bm(self, tmp_path):
+        ws = _mk_ws(tmp_path)
+        bm = export_soul(workspace=ws, output=tmp_path / "test.bm")
+        report = check_package_health(bm)
+
+        assert report.agent_name  # detected (at minimum "unknown-agent")
+        assert report.workspace == bm
+        assert len(report.checks) > 0
+        assert 0 <= report.health_score <= 100
+
+    def test_identity_layer_has_checks(self, tmp_path):
+        ws = _mk_ws(tmp_path)
+        bm = export_soul(workspace=ws, output=tmp_path / "test.bm")
+        report = check_package_health(bm)
+        layers = {c.layer for c in report.checks}
+        assert "identity" in layers
+        assert "memory" in layers
+        assert "config" in layers
+        assert "skills" in layers
+
+    def test_missing_bm_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            check_package_health(tmp_path / "nope.bm")
+
+    def test_detects_present_files(self, tmp_path):
+        ws = _mk_ws(tmp_path)
+        bm = export_soul(workspace=ws, output=tmp_path / "test.bm")
+        report = check_package_health(bm)
+        # At least one identity check should be ok
+        identity_checks = [c for c in report.checks if c.layer == "identity"]
+        assert any(c.status == "ok" for c in identity_checks)
+
+    def test_warns_when_skills_have_no_skill_md(self, tmp_path):
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        (ws / "IDENTITY.md").write_text("Name: T\n🤖", encoding="utf-8")
+        (ws / "SOUL.md").write_text("# soul" * 50, encoding="utf-8")
+        (ws / "AGENTS.md").write_text("rules. must. always.", encoding="utf-8")
+        # skill dir WITHOUT SKILL.md
+        d = ws / "skills" / "empty-skill"
+        d.mkdir(parents=True)
+        (d / "notes.md").write_text("just notes", encoding="utf-8")
+
+        bm = export_soul(workspace=ws, output=tmp_path / "test.bm")
+        report = check_package_health(bm)
+        skills_checks = [c for c in report.checks if c.layer == "skills"]
+        assert any(c.status == "warn" for c in skills_checks)

@@ -19,7 +19,7 @@ from .core import (
     absorb_soul, changelog as core_changelog, diff_packages, diff_soul,
     export_soul, inspect_soul, merge_souls,
 )
-from .doctor import DoctorReport, check_soul_health
+from .doctor import DoctorReport, check_package_health, check_soul_health
 from .manifest import Manifest
 
 # Ensure UTF-8 output on Windows
@@ -340,19 +340,131 @@ def _merge_semantic(pkg_paths, out, dry_run):
 @main.command()
 @click.option("--workspace", "-w", type=click.Path(exists=True), default=None,
               help="Agent workspace path (auto-detects OpenClaw)")
-def doctor(workspace):
-    """🩺 Check your agent's soul health across all five layers."""
+@click.argument("target", required=False, type=click.Path(exists=True))
+def doctor(workspace, target):
+    """🩺 Check agent soul health. TARGET can be a .bm file or workspace directory."""
     console.print(BANNER)
 
     from .scanner import find_openclaw_workspace
 
+    # Target takes precedence; auto-detect .bm vs directory
+    if target:
+        target_path = Path(target)
+        if target_path.is_file() and target_path.suffix == ".bm":
+            try:
+                report = check_package_health(target_path)
+            except (FileNotFoundError, ValueError) as e:
+                console.print(f"[bold red]❌ {e}[/]")
+                sys.exit(1)
+            _print_doctor_report(report)
+            return
+        else:
+            workspace = target
+
     ws = Path(workspace) if workspace else find_openclaw_workspace()
     if ws is None:
-        console.print("[bold red]❌ Cannot find OpenClaw workspace. Use --workspace to specify.[/]")
+        console.print("[bold red]❌ Cannot find OpenClaw workspace. Use --workspace or pass a .bm file.[/]")
         sys.exit(1)
 
     report = check_soul_health(ws)
     _print_doctor_report(report)
+
+
+@main.command()
+@click.argument("package", type=click.Path(exists=True, dir_okay=False))
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON (scriptable)")
+def score(package, as_json):
+    """⭐ Score an agent soul across 5 dimensions (stats-only, offline).
+
+    PACKAGE: path to a .bm file.
+
+    Outputs five-dimension scores (Memory/Personality/Habits/Skills/Uniqueness)
+    and a weighted total. This is the statistical baseline — no LLM calls.
+    """
+    from .scorer import score_soul
+
+    pkg_path = Path(package)
+    try:
+        scores, analysis = score_soul(pkg_path)
+    except (FileNotFoundError, ValueError) as e:
+        console.print(f"[bold red]❌ {e}[/]")
+        sys.exit(1)
+
+    if as_json:
+        import json as _json
+        from .tiers import tier_from_score
+        payload = {
+            "agent_name": analysis.get("agent_name", ""),
+            "source_framework": analysis.get("source_framework", ""),
+            "content_hash": analysis.get("content_hash", ""),
+            "scores": scores.to_dict(),
+            "tier": tier_from_score(scores.total_score).to_dict(),
+        }
+        click.echo(_json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+
+    console.print(BANNER)
+
+    # Header — tier from unified cyber evolution hierarchy
+    from .tiers import tier_from_score
+    tier = tier_from_score(scores.total_score)
+    total = scores.total_score
+
+    header = Table.grid(padding=(0, 2))
+    header.add_row("Agent", f"[bold]{analysis.get('agent_name', '?')}[/]")
+    framework = analysis.get("source_framework") or "—"
+    header.add_row("Framework", f"[dim]{framework}[/]")
+    header.add_row("Package", f"[dim]{pkg_path.name}[/]")
+    header.add_row(
+        "Tier",
+        f"[bold]T{tier.tier} {tier.name} {tier.name_zh}[/]  "
+        f"[yellow]{tier.star_display}[/]  "
+        f"[dim]({tier.score_range})[/]",
+    )
+    header.add_row("Total", f"[bold]{total}/100[/]")
+    console.print(Panel(header, title="[bold]⭐ Soul Score[/]", border_style="cyan"))
+
+    # Dimension table with ASCII bars
+    table = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
+    table.add_column("", width=3)
+    table.add_column("Dimension", style="cyan")
+    table.add_column("Score", justify="right")
+    table.add_column("Weight", justify="right")
+    table.add_column("Weighted", justify="right")
+    table.add_column("Bar", width=22)
+
+    dims = [
+        scores.memory_depth,
+        scores.personality_richness,
+        scores.habit_maturity,
+        scores.skill_breadth,
+        scores.uniqueness,
+    ]
+    for d in dims:
+        filled = int(d.raw_score / 5)  # 20-char bar = 100/5
+        bar = "█" * filled + "░" * (20 - filled)
+        if d.raw_score >= 70:
+            bar_color = "green"
+        elif d.raw_score >= 40:
+            bar_color = "yellow"
+        else:
+            bar_color = "red"
+        table.add_row(
+            d.emoji,
+            f"{d.name_zh}",
+            f"{d.raw_score:.0f}/100",
+            f"{int(d.weight * 100)}%",
+            f"{d.weighted_score:.1f}",
+            f"[{bar_color}]{bar}[/]",
+        )
+
+    console.print()
+    console.print(table)
+
+    console.print(
+        f"\n[dim]Stats-only scoring. For LLM-augmented scores + biography,[/] "
+        f"[bold]upload to soul.polly.wang[/][dim].[/]\n"
+    )
 
 
 @main.command()
@@ -892,18 +1004,14 @@ def _print_doctor_report(report: DoctorReport):
         if check.suggestion:
             console.print(f"      [dim]→ {check.suggestion}[/]")
 
-    # Footer — aligned with SoulArena's 5-tier level system
+    # Footer — aligned with unified cyber evolution hierarchy (7 tiers × 3 stars)
+    from .tiers import tier_from_score
+    tier = tier_from_score(score)
     console.print()
-    if score >= 81:
-        console.print("[bold green]🌊 北冥-level soul! Transcendent.[/]")
-    elif score >= 61:
-        console.print("[bold green]🦅 Peng-level soul! Soaring high.[/]")
-    elif score >= 41:
-        console.print("[bold yellow]🐋 Kun-level soul! Deep and growing.[/]")
-    elif score >= 21:
-        console.print("[bold yellow]🐟 Fish-level soul. Keep swimming.[/]")
-    else:
-        console.print("[bold red]🥚 Egg-level soul. Just hatched — lots of room to grow![/]")
+    console.print(
+        f"[bold]Tier:[/] T{tier.tier} [bold]{tier.name}[/] {tier.name_zh}  "
+        f"[yellow]{tier.star_display}[/]  [dim]({tier.score_range})[/]"
+    )
 
     console.print(f"\n[dim]See your soul's portrait at[/] [bold]soul.polly.wang[/]\n")
 

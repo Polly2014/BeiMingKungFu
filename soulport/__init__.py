@@ -4,4 +4,4 @@ SoulPort — Agent Soul Transfer
 Export, absorb, and merge AI agent identities across machines.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
