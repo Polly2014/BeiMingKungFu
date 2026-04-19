@@ -1,3 +1,4 @@
+# --- Python ---
 __pycache__/
 *.pyc
 *.pyo
@@ -5,11 +6,49 @@ __pycache__/
 dist/
 build/
 .eggs/
-*.bm
+*.egg
+.tox/
+.nox/
+
+# --- Testing / Linting ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# --- Virtualenv ---
 .venv/
+venv/
+env/
 .env
+.env.*
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# --- SoulPort artifacts ---
+*.bm
+*.bm.enc
+
+# --- Confidential (never commit) ---
+CLAUDE.md
 docs/
 Patent/
 Paper/
-CLAUDE.md
-.DS_Store
+
+# --- LaTeX build artifacts ---
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
